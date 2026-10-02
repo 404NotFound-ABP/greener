@@ -1,17 +1,8 @@
 # Backlog — GreenER
 
-Planejamento inicial. As prioridades indicam a ordem sugerida de trabalho.
-
-- **EP:** épico, que reúne histórias com um objetivo comum.
-- **US:** história de usuário.
-- **RF:** requisito funcional do projeto.
-- **DOD:** o que verificar para considerar a entrega concluída.
-- **DOR:** o que precisa estar definido para começar.
-- **ACEITE:** comportamento esperado da entrega.
-
 ---
 
-## ![Prioridade alta](https://img.shields.io/badge/Prioridade-Alta-red) EP01 - Monitorar os serviços
+## ![Alta](https://img.shields.io/badge/Prioridade-Alta-red) EP01 - Monitorar os serviços
 
 **RF relacionados:** RF01, RF02, RF03, RF04, RF05 e RF06.
 
@@ -33,6 +24,8 @@ Planejamento inicial. As prioridades indicam a ordem sugerida de trabalho.
 
 ### US01 - Descobrir os serviços disponíveis | RF01
 
+**Prioridade:** alta.
+
 Como usuário, quero que o sistema encontre os serviços disponíveis para iniciar o monitoramento sem cadastro manual.
 
 **DOD**
@@ -45,10 +38,12 @@ Como usuário, quero que o sistema encontre os serviços disponíveis para inici
 
 **ACEITE**
 
-- [ ] Obter os serviços disponíveis, com identificador e nome.
-- [ ] Tratar lista vazia sem erro; uma falha na API não deve apagar os serviços já conhecidos.
+- [ ] Obter os serviços disponíveis, com identificador e nome, sem duplicações.
+- [ ] Tratar lista vazia sem erro; falha na API não deve apagar os serviços já conhecidos.
 
 ### US02 - Coletar e atualizar as métricas | RF03, RF04
+
+**Prioridade:** alta.
 
 Como usuário, quero receber métricas recentes para acompanhar o uso dos recursos de cada serviço.
 
@@ -68,6 +63,8 @@ Como usuário, quero receber métricas recentes para acompanhar o uso dos recurs
 
 ### US03 - Acompanhar mudanças nos serviços | RF02
 
+**Prioridade:** alta.
+
 Como usuário, quero que o monitoramento acompanhe as mudanças do ambiente para manter as informações atualizadas.
 
 **DOD**
@@ -86,6 +83,8 @@ Como usuário, quero que o monitoramento acompanhe as mudanças do ambiente para
 
 ### US04 - Identificar serviço indisponível | RF05
 
+**Prioridade:** alta.
+
 Como usuário, quero saber quando um serviço não responde para entender seu estado.
 
 **DOD**
@@ -103,6 +102,8 @@ Como usuário, quero saber quando um serviço não responde para entender seu es
 
 ### US05 - Identificar serviço sem métricas | RF06
 
+**Prioridade:** alta.
+
 Como usuário, quero distinguir um serviço sem métricas de um serviço indisponível para interpretar corretamente seu estado.
 
 **DOD**
@@ -116,11 +117,11 @@ Como usuário, quero distinguir um serviço sem métricas de um serviço indispo
 **ACEITE**
 
 - [ ] Sinalizar “sem métricas” quando o serviço continuar listado, mas deixar de exportar métricas.
-- [ ] Manter as informações disponíveis e indicar que as estimativas sem dados suficientes estão indisponíveis.
+- [ ] Manter as informações disponíveis e indicar que estimativas sem dados suficientes estão indisponíveis.
 
 ---
 
-## ![Prioridade alta](https://img.shields.io/badge/Prioridade-Alta-red) EP02 - Estimar o impacto ambiental
+## ![Alta](https://img.shields.io/badge/Prioridade-Alta-red) EP02 - Estimar o impacto ambiental
 
 **RF relacionado:** RF07.
 
@@ -140,6 +141,8 @@ Como usuário, quero distinguir um serviço sem métricas de um serviço indispo
 
 ### US06 - Calcular energia e emissão por serviço | RF07
 
+**Prioridade:** alta.
+
 Como usuário, quero conhecer a energia e a emissão estimadas de cada serviço para avaliar seu impacto ambiental.
 
 **DOD**
@@ -158,9 +161,16 @@ Como usuário, quero conhecer a energia e a emissão estimadas de cada serviço 
 
 ---
 
-## ![Prioridade alta](https://img.shields.io/badge/Prioridade-Alta-red) EP03 - Acompanhar o ambiente no dashboard
+## ![Após a base](https://img.shields.io/badge/Entrega-Ap%C3%B3s_a_base-blue) EP03 - Acompanhar o ambiente no dashboard
 
 **RF relacionados:** RF08, RF09, RF11 e RF12.
+
+**Prioridade e sequência:**
+- RF08 e RF09: entrega após a base de monitoramento e cálculo.
+- RF12: média.
+- RF11: baixa.
+
+**Antecipação:** protótipos, componentes e definição dos dados podem começar antes. A entrega integrada de RF08 e RF09 depende da base funcionando.
 
 ### DOD
 
@@ -179,6 +189,8 @@ Como usuário, quero conhecer a energia e a emissão estimadas de cada serviço 
 
 ### US07 - Visualizar estados e métricas | RF09 — estados e métricas
 
+**Sequência:** após a base de monitoramento; preparação pode ser antecipada.
+
 Como usuário, quero visualizar os serviços e suas métricas em uma tela para acompanhar o ambiente.
 
 **DOD**
@@ -196,6 +208,8 @@ Como usuário, quero visualizar os serviços e suas métricas em uma tela para a
 
 ### US08 - Visualizar indicadores consolidados | RF08
 
+**Sequência:** após monitoramento e cálculo; preparação pode ser antecipada.
+
 Como usuário, quero ver os totais do ambiente para compreender seu impacto e disponibilidade.
 
 **DOD**
@@ -212,7 +226,48 @@ Como usuário, quero ver os totais do ambiente para compreender seu impacto e di
 - [ ] Usar o mesmo período nos totais e informar quais serviços possuem dados válidos.
 - [ ] Identificar totais parciais; dados ausentes não contam como zero.
 
+### US18 - Mostrar energia e emissão no dashboard | RF09 — indicadores ambientais
+
+**Sequência:** após o cálculo individual; preparação pode ser antecipada.
+
+Como usuário, quero ver o consumo energético e a emissão estimados de cada serviço para entender seu impacto ambiental.
+
+**DOD**
+
+- Tela integrada ao cálculo da US06 e verificada com resultados reais.
+
+**DOR**
+
+- Dados do cálculo disponíveis por contrato e apresentação na tela definida.
+
+**ACEITE**
+
+- [ ] Mostrar energia em kWh e emissão em gCO₂e por serviço, com período identificado.
+- [ ] Valores pequenos devem continuar distinguíveis de zero.
+- [ ] Informar quando não for possível calcular algum resultado.
+
+### US10 - Visualizar a localização dos serviços | RF12, RF09 — localização
+
+**Prioridade:** média.
+
+Como usuário, quero conhecer a localização dos serviços para entender onde estão hospedados.
+
+**DOD**
+
+- Localização integrada à lista; casos com dados completos e ausentes verificados.
+
+**DOR**
+
+- Campos de país, região e cidade conhecidos; apresentação definida.
+
+**ACEITE**
+
+- [ ] Mostrar país e região; mostrar cidade quando disponível.
+- [ ] Ausência de cidade ou coordenadas não impede a exibição das demais informações.
+
 ### US09 - Atualizar o dashboard automaticamente | RF11
+
+**Prioridade:** baixa.
 
 Como usuário, quero receber atualizações automáticas para acompanhar mudanças sem recarregar a página.
 
@@ -230,50 +285,16 @@ Como usuário, quero receber atualizações automáticas para acompanhar mudanç
 - [ ] Mostrar os intervalos de coleta e atualização, além da data/hora da última atualização bem-sucedida.
 - [ ] Em falha, identificar os dados anteriores como desatualizados e retomar após recuperação.
 
-### US10 - Visualizar a localização dos serviços | RF12, RF09 — localização
-
-Como usuário, quero conhecer a localização dos serviços para entender onde estão hospedados.
-
-**DOD**
-
-- Localização integrada à lista; casos com dados completos e ausentes verificados.
-
-**DOR**
-
-- Campos de país, região e cidade conhecidos; apresentação definida.
-
-**ACEITE**
-
-- [ ] Mostrar país e região; mostrar cidade quando disponível.
-- [ ] Ausência de cidade ou coordenadas não impede a exibição das demais informações.
-
-### US18 - Visualizar energia e emissão por serviço | RF09 — indicadores ambientais
-
-Como usuário, quero ver as estimativas ambientais junto de cada serviço para compreender seu impacto.
-
-**DOD**
-
-- Estimativas reais da US06 integradas à tela; unidades, período e falhas verificados.
-
-**DOR**
-
-- Dados de energia e emissão, unidades e apresentação dos valores definidos.
-
-**ACEITE**
-
-- [ ] Mostrar energia em kWh e emissão em gCO₂e por serviço, com período identificado.
-- [ ] Valores pequenos devem continuar distinguíveis de zero.
-- [ ] Indicar quando não houver dados suficientes para calcular energia ou emissão.
-
 > RF09 estará completo com US07, US10 e US18 integradas.
+> US06 calcula os resultados; US18 apresenta esses resultados na tela.
 
 ---
 
-## ![Prioridade alta](https://img.shields.io/badge/Prioridade-Alta-red) EP04 - Consultar histórico e comparar serviços
+## ![Baixa](https://img.shields.io/badge/Prioridade-Baixa-lightgrey) EP04 - Consultar histórico e comparar serviços
 
 **RF relacionados:** RF10, RF14 e RF15.
 
-**Ordem sugerida:** salvar coletas primeiro; ranking e comparação têm prioridade baixa na sequência.
+**Antecipação:** a estrutura do banco e a gravação básica podem ser preparadas junto à coleta, mantendo a prioridade definida.
 
 ### DOD
 
@@ -291,6 +312,8 @@ Como usuário, quero ver as estimativas ambientais junto de cada serviço para c
 - [ ] Comparar dois ou mais serviços por métricas e indicadores ambientais do mesmo período.
 
 ### US11 - Salvar o histórico das coletas | RF10 — armazenamento
+
+**Prioridade:** baixa.
 
 Como usuário, quero preservar as coletas para analisar o comportamento dos serviços ao longo do tempo.
 
@@ -310,6 +333,8 @@ Como usuário, quero preservar as coletas para analisar o comportamento dos serv
 
 ### US12 - Consultar o histórico por período | RF10 — consulta
 
+**Prioridade:** baixa.
+
 Como usuário, quero consultar as coletas de um período para analisar a evolução de um serviço.
 
 **DOD**
@@ -327,6 +352,8 @@ Como usuário, quero consultar as coletas de um período para analisar a evoluç
 - [ ] Recusar período inválido e indicar ausência ou lacunas de dados.
 
 ### US13 - Ordenar serviços por impacto | RF14
+
+**Prioridade:** baixa.
 
 Como usuário, quero ordenar serviços por energia ou emissão para identificar os maiores impactos.
 
@@ -346,6 +373,8 @@ Como usuário, quero ordenar serviços por energia ou emissão para identificar 
 
 ### US14 - Comparar serviços | RF15
 
+**Prioridade:** baixa.
+
 Como usuário, quero comparar serviços para avaliar diferenças no uso de recursos e no impacto ambiental.
 
 **DOD**
@@ -364,11 +393,13 @@ Como usuário, quero comparar serviços para avaliar diferenças no uso de recur
 
 ---
 
-## ![Prioridade média](https://img.shields.io/badge/Prioridade-M%C3%A9dia-yellow) EP05 - Configurar o monitoramento com segurança
+## ![Média](https://img.shields.io/badge/Prioridade-M%C3%A9dia-yellow) EP05 - Configurar o monitoramento com segurança
 
 **RF relacionado:** RF16.
 
 **Escopo inicial proposto:** configurar os intervalos de coleta e atualização do dashboard.
+
+**Antecipação:** definir parâmetros, limites, fluxo de login e proteção das rotas.
 
 ### DOD
 
@@ -387,6 +418,8 @@ Como usuário, quero comparar serviços para avaliar diferenças no uso de recur
 
 ### US15 - Autenticar o responsável pela configuração | RF16 — autenticação
 
+**Prioridade:** média.
+
 Como responsável pelo monitoramento, quero entrar com minhas credenciais para acessar a configuração.
 
 **DOD**
@@ -404,6 +437,8 @@ Como responsável pelo monitoramento, quero entrar com minhas credenciais para a
 - [ ] Sair encerra a sessão na interface.
 
 ### US16 - Alterar os intervalos do monitoramento | RF16 — configuração protegida
+
+**Prioridade:** média.
 
 Como responsável autenticado, quero alterar os intervalos para ajustar a frequência do monitoramento.
 
@@ -426,9 +461,11 @@ Como responsável autenticado, quero alterar os intervalos para ajustar a frequ�
 
 ---
 
-## ![Prioridade média](https://img.shields.io/badge/Prioridade-M%C3%A9dia-yellow) EP06 - Visualizar serviços no mapa
+## ![Média](https://img.shields.io/badge/Prioridade-M%C3%A9dia-yellow) EP06 - Visualizar serviços no mapa
 
 **RF relacionado:** RF13.
+
+**Antecipação:** identificar coordenadas disponíveis e preparar o protótipo.
 
 **Escopo a confirmar:** o requisito usa “poderá”; confirmar a inclusão do mapa antes de assumir a entrega.
 
@@ -449,6 +486,8 @@ Como responsável autenticado, quero alterar os intervalos para ajustar a frequ�
 
 ### US17 - Localizar serviços no mapa | RF13
 
+**Prioridade:** média.
+
 Como usuário, quero visualizar a posição aproximada dos serviços para entender sua distribuição geográfica.
 
 **DOD**
@@ -464,7 +503,3 @@ Como usuário, quero visualizar a posição aproximada dos serviços para entend
 - [ ] Exibir marcadores para serviços com latitude e longitude válidas.
 - [ ] Permitir identificar o serviço pelo marcador.
 - [ ] Ausência de coordenadas não impede visualizar localização textual, métricas e indicadores.
-
----
-
-US18 mantém seu identificador para preservar os vínculos com o planejamento existente.
