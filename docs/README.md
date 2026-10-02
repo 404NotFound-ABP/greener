@@ -4,14 +4,6 @@ Este diretório reúne a documentação técnica, o planejamento e o contexto ac
 
 O projeto está em preparação inicial. As propostas serão atualizadas conforme as decisões da equipe e o desenvolvimento da aplicação.
 
-## Documentação técnica
-
-| Documento | Conteúdo |
-|---|---|
-| [Arquitetura](arquitetura.md) | Componentes, responsabilidades, fluxo de dados e decisões técnicas. |
-| [Cálculos](calculos.md) | Fórmulas, unidades, fatores e períodos das estimativas de energia e CO₂e. |
-| [API](api.md) | Integrações externas e documentação dos endpoints da aplicação. |
-| [Interface](interface.md) | Usuários, tarefas, protótipos e avaliação de usabilidade. |
 
 ## Contexto e planejamento acadêmico
 
