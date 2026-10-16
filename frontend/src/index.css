@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: #000;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(75, 85, 99, 0.5);
+  border-radius: 4px;
+}
+.theme-dark .leaflet-tile {
+  filter: grayscale(100%) invert(100%) brightness(75%) contrast(120%);
+}
