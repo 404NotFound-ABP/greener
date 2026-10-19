@@ -18,6 +18,7 @@ services:
       timeout: 5s
       retries: 10
 
+<<<<<<< HEAD
   backend:
     build:
       context: ./backend
@@ -35,6 +36,15 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+=======
+frontend:
+    build:
+      context: ./frontend
+    container_name: greener-frontend
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+>>>>>>> 31e7d53 (configuração do dockerfile do front, remoção do mapa claro, adição do funcionamento dos filtros do estado de serviço e tentativa de correção do bug ao desmarcar filtro com o modal de serviço aberto.)
 
   frontend:
     build:
