@@ -1,9 +1,11 @@
 import React from 'react';
-import { DashboardPage } from './pages/DashboardPage';
+import { MapBackground } from './components/MapBackground';
 
 function App() {
   return (
-    <DashboardPage />
+    <div className="w-screen h-screen overflow-hidden">
+      <MapBackground />
+    </div>
   );
 }
 

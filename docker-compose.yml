@@ -17,5 +17,13 @@ services:
       timeout: 5s
       retries: 10
 
+frontend:
+    build:
+      context: ./frontend
+    container_name: greener-frontend
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
 volumes:
   postgres_data:
