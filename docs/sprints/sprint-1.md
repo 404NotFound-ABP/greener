@@ -98,21 +98,8 @@ Esta tabela organiza evidências; não substitui a avaliação do professor.
 | IHC03 — indicadores e estados | Parcialmente atendido | Estados usam texto/ícone além da cor; valores, período e CO₂e são inconsistentes/simulados |
 | IHC04 — responsividade e feedback | Parcialmente atendido | Há versão mobile no Figma e alguns estados visuais; código mobile, loading e erro real não foram verificados |
 
-## Validação técnica
 
-Validações repetidas no workspace em 19/10/2026:
 
-| Camada | Comando | Resultado |
-|---|---|---|
-| Frontend | `npm ci` | Aprovado: 181 pacotes, 0 vulnerabilidades reportadas |
-| Frontend | `npm run dev -- --host 127.0.0.1` | Aprovado: Vite 8.3.4 iniciou em `127.0.0.1:5173` |
-| Frontend | `npm run build` | Reprovado: import `React` não usado em `App.tsx`; `DashboardPage` não fornece props obrigatórias ao `Sidebar` |
-| Frontend | `npm run lint` | Reprovado: `no-explicit-any` em `MapBackground.tsx` |
-| Backend | `npm ci` | Concluído com avisos de engine e 4 vulnerabilidades moderadas reportadas pelo npm |
-| Backend | `npm run build` | Reprovado: TypeScript 7.0.2 não fornece a API de compilador exigida pelo Nest CLI |
-| Compose | `docker compose config --no-interpolate` | Reprovado: `POSTGRES_PASSWORD` foi definido como lista, não como valor escalar |
-
-Não há script de testes no frontend nem no backend.
 
 ## Como verificar a entrega
 
@@ -135,31 +122,7 @@ Na interface, verificar:
 
 Os dados são simulados e o mapa exige internet.
 
-## Sprint Review
 
-Não foi encontrada evidência versionada de uma Sprint Review formal, seus participantes, feedback ou decisões. Portanto, este documento não registra uma reunião como se ela tivesse ocorrido.
-
-Para o fechamento acadêmico, o incremento demonstrável é o protótipo descrito acima. A issue [#48](https://github.com/404NotFound-ABP/greener/issues/48) deve permanecer aberta até que apresentação, feedback e decisões sejam efetivamente registrados.
-
-## Retrospectiva documental
-
-Esta seção é uma análise de evidências feita no fechamento, não uma ata de retrospectiva da equipe.
-
-### Pontos positivos
-
-- backlog amplo e com critérios de aceite;
-- evolução visual em pequenos commits;
-- estados críticos representados também por texto e ícones;
-- protótipo Figma cobre desktop, mobile e exceções.
-
-### Problemas observados
-
-- planejamento e acompanhamento não foram documentados junto com a execução;
-- escopo de protótipo e funcionalidade integrada foi misturado nos status;
-- tarefas, issues e Project possuem divergências;
-- backend e banco foram representados por arquivos vazios;
-- não há PRs, reviews, testes ou CI;
-- documentação inicial ficou desatualizada em relação à branch `dev`.
 
 ### Ações para a Sprint 2
 
