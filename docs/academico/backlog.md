@@ -2,12 +2,7 @@
 
 > Este é o backlog do produto, não uma lista de funcionalidades entregues. As caixas permanecem desmarcadas enquanto os critérios funcionais não forem integrados e verificados. O recorte entregue na Sprint 1 está em [`docs/sprints/sprint-1.md`](../sprints/sprint-1.md) e o acompanhamento está no [GitHub Project #5](https://github.com/users/404NotFound-ABP/projects/5).
 
-## Rastreabilidade da Sprint 1
 
-- status histórico fechado/Done, mas com evidência parcial frente ao DOD atual: [#39](https://github.com/404NotFound-ABP/greener/issues/39), [#43](https://github.com/404NotFound-ABP/greener/issues/43) e [#47](https://github.com/404NotFound-ABP/greener/issues/47);
-- protótipo parcial/carryover: [#45](https://github.com/404NotFound-ABP/greener/issues/45);
-- frontend com dados simulados: commits [`00d200c`](https://github.com/404NotFound-ABP/greener/commit/00d200c1faea3c8835c4e26a98064f48be34256a), [`44b94bb`](https://github.com/404NotFound-ABP/greener/commit/44b94bb06e8114dee01a86357c48db715e59b336) e [`31e7d53`](https://github.com/404NotFound-ABP/greener/commit/31e7d538f359b30f10e1b6cec803f1533c782e0f);
-- API, persistência, cálculo, autenticação e integração Docker: não concluídos na Sprint 1.
 
 ---
 
