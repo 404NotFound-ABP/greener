@@ -31,7 +31,10 @@ A plataforma utilizará dados de CPU, memória, armazenamento e rede, juntamente
 
 ## Status
 
-O projeto está em fase de planejamento e organização inicial do repositório.
+O projeto está em fase de planejamento, organização inicial do repositório e a realização de protótipos.
+
+## Link: 
+[Figma](https://www.figma.com/design/zPrdeRlYtzyWwmbuTiwQqE/GeenER?node-id=0-1&t=Kgp5UHKRUuOe7r3f-1)
 
 As funcionalidades descritas representam o escopo previsto e ainda não estão implementadas. As instruções de configuração, execução e testes serão adicionadas conforme o desenvolvimento avançar.
 
