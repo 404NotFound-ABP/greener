@@ -9,7 +9,7 @@ Este registro usa somente identidades e ações verificáveis no GitHub. Quando 
 | `PedroSmp` (Pedro Sampaio) | Prototipação de interface | Protótipos de lista/estados, atualização, indicadores e localização; fechamento das quatro issues de protótipo | Issues [#39](https://github.com/404NotFound-ABP/greener/issues/39), [#43](https://github.com/404NotFound-ABP/greener/issues/43), [#45](https://github.com/404NotFound-ABP/greener/issues/45) e [#47](https://github.com/404NotFound-ABP/greener/issues/47); [Figma](https://www.figma.com/design/zPrdeRlYtzyWwmbuTiwQqE/GeenER?node-id=0-1) |
 | `arianaferresan` (Ariana Ferreira) | Organização do trabalho | Criação das subtarefas #49–#53 e movimentação de tarefas no Project | [Project #5](https://github.com/users/404NotFound-ABP/projects/5), [#49](https://github.com/404NotFound-ABP/greener/issues/49) a [#53](https://github.com/404NotFound-ABP/greener/issues/53) |
 | `felipefmac` (Felipe Machado) | Backend e banco planejados | Responsabilidade atribuída e movimentação das tarefas #46 e #52; não há entrega técnica individual vinculada no snapshot | Issues [#46](https://github.com/404NotFound-ABP/greener/issues/46) e [#52](https://github.com/404NotFound-ABP/greener/issues/52) |
-| Conta do projeto `404NotFound-ABP` | Documentação e backlog | Histórico inicial, READMEs, backlog e criação da maior parte das issues | [Histórico de commits](https://github.com/404NotFound-ABP/greener/commits/main/) |
+| 'luiza-manchini' | P.O - Documentação e backlog | Histórico inicial, READMEs, backlog e criação da maior parte das issues | [Histórico de commits](https://github.com/404NotFound-ABP/greener/commits/main/) |
 
 ## Limites da evidência
 
