@@ -7,16 +7,13 @@
 - **Objetivo reconstruído a partir do backlog e das tarefas:** organizar o produto, prototipar a experiência principal e preparar a base tecnológica.
 - **Código analisado:** `dev` no commit [`31e7d53`](https://github.com/404NotFound-ABP/greener/commit/31e7d538f359b30f10e1b6cec803f1533c782e0f).
 - **Documentação da entrega:** consolidada na branch `main`; o código do protótipo permanece na `dev`.
-- **Tag `sprint-1`:** ainda não criada; deve apontar para a versão aprovada e incorporada para avaliação.
-- **Snapshot versionado:** [`docs/evidencias/sprint-1/README.md`](../evidencias/sprint-1/README.md).
 
-As datas oficiais da disciplina não estavam versionadas. A janela acima representa apenas a atividade que pode ser comprovada no repositório.
+
 
 ## Resumo executivo
 
 A Sprint 1 entregou organização do produto, protótipos no Figma e um primeiro incremento visual em React/TypeScript. O frontend permite demonstrar mapa, lista, filtros e estados com dados simulados. O backend, o banco e o Docker permanecem como estrutura parcial.
 
-Não foram entregues: API funcional, integração com fontes de dados, coleta periódica, cálculo ambiental validado, persistência, autenticação, testes automatizados ou ambiente completo por Docker.
 
 ## Estado do Project no fechamento
 
