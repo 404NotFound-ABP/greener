@@ -102,7 +102,7 @@
 | `PedroSmp` | #39–#43, #45 e #47 | Arquivo Figma e protótipos vinculados às issues | Figma, comentários nas issues #39/#43/#47 e issues fechadas |
 | `arianaferresan` | Organização das subtarefas | Criação de #49–#53 e movimentações no Project | Histórico das issues/Project |
 | `felipefmac` | Backend, banco e integração | Planejamento e movimentação de #46/#52; entrega técnica não evidenciada | Issues/Project |
-| `404NotFound-ABP` | Backlog/documentação | Backlog, estrutura documental e issues iniciais | Commits da conta do projeto; autoria individual não identificada |
+| `luiza-manchini` | Backlog/documentação | Backlog, estrutura documental e issues iniciais | Commits da conta do projeto; autoria individual não identificada |
 
 ## Ajustes de rastreabilidade necessários
 
