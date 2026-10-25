@@ -234,11 +234,11 @@ $$\text{CO}_2\text{e (g)} = \text{Energia (kWh)} \times \text{carbon\_intensity\
 
 ---
 
-### 2. Status Operacionais Oficiais (Greener.html)
+### 2. Status Operacionais Oficiais
 
 Durante a execução do desafio, serviços podem ser adicionados, removidos ou tornar-se indisponíveis dinamicamente. O backend identifica e apresenta exatamente os 3 status oficiais da especificação:
 
-| Status | Indicador (Regra Oficial Greener.html) | `metricas` | `impacto` | Comportamento no GreenER |
+| Status | Indicador | `metricas` | `impacto` | Comportamento no GreenER |
 |---|---|:---:|:---:|---|
 | **`disponivel`** | Listado em `/services` + Produzindo métricas (HTTP 200) | Preenchido | Preenchido com W, kWh e gCO₂e | Sucesso completo; pronto para exibição no dashboard. |
 | **`indisponivel`** | Listado em `/services` + Não produzindo métricas (HTTP 500 / timeout) | `null` | `null` | Retorna JSON limpo com status indisponível sem derrubar a aplicação. |
