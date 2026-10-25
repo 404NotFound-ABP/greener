@@ -109,8 +109,14 @@ export class ServidorImpactoDiscriminadoResponseDto {
   @ApiProperty({ example: 'disponivel', enum: ['disponivel', 'indisponivel', 'removido'] })
   status!: string;
 
+  @ApiProperty({ example: 'instantaneo', enum: ['instantaneo', 'acumulado'] })
+  criterio!: string;
+
   @ApiProperty({ example: 'tempo_real', enum: ['tempo_real', 'banco_historico'] })
   origem!: string;
+
+  @ApiProperty({ example: 85, description: 'Total de coletas agregadas no acumulado', required: false })
+  total_coletas?: number;
 
   @ApiProperty({ type: RegiaoDetalhesDto })
   regiao!: RegiaoDetalhesDto;

@@ -1,6 +1,13 @@
 import { Controller, Get, Param, Query } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from "@nestjs/swagger";
 import { ServidoresService } from "./servidores.service";
+import {
+    DashboardResponseDto,
+    RankingResponseDto,
+    ComparativoResponseDto,
+    HistoricoServidorResponseDto,
+    ServidorComRegiaoDto,
+} from "./dto/servidores.dto";
 
 @Controller('/api/servidores')
 export class ServidoresController {
@@ -9,8 +16,8 @@ export class ServidoresController {
     @ApiTags('Frontend - Banco de Dados')
     @Get('dashboard')
     @ApiOperation({ summary: 'Dados consolidados para o dashboard do frontend (resumo + servidores + última telemetria)' })
-    @ApiResponse({ status: 200, description: 'Resumo geral e lista de servidores com última coleta' })
-    async getDashboard() {
+    @ApiResponse({ status: 200, description: 'Resumo geral e lista de servidores com última coleta', type: DashboardResponseDto })
+    async getDashboard(): Promise<DashboardResponseDto> {
         return this.servidoresService.getDashboardData();
     }
 
@@ -18,7 +25,8 @@ export class ServidoresController {
     @Get('comparativo')
     @ApiOperation({ summary: 'Compara consumo de energia e emissões entre servidores' })
     @ApiQuery({ name: 'ids', required: false, description: 'IDs dos servidores separados por vírgula (ex: billing-api,checkout-worker)' })
-    async getComparativo(@Query('ids') ids?: string) {
+    @ApiResponse({ status: 200, description: 'Comparativo entre servidores selecionados', type: ComparativoResponseDto })
+    async getComparativo(@Query('ids') ids?: string): Promise<ComparativoResponseDto> {
         const idList = ids ? ids.split(',').map((id) => id.trim()).filter(Boolean) : undefined;
         return this.servidoresService.getComparativo(idList);
     }
@@ -30,12 +38,13 @@ export class ServidoresController {
     @ApiQuery({ name: 'ordem', required: false, enum: ['desc', 'asc'], description: 'Direção da ordenação (padrão: desc)' })
     @ApiQuery({ name: 'criterio', required: false, enum: ['acumulado', 'instantaneo'], description: 'Critério: acumulado histórico ou instantâneo última coleta (padrão: acumulado)' })
     @ApiQuery({ name: 'limite', required: false, description: 'Quantidade máxima no ranking (padrão: 10)' })
+    @ApiResponse({ status: 200, description: 'Ranking de servidores ordenado', type: RankingResponseDto })
     async getRanking(
         @Query('ordenarPor') ordenarPor?: 'emissoes' | 'energia',
         @Query('ordem') ordem?: 'desc' | 'asc',
         @Query('criterio') criterio?: 'acumulado' | 'instantaneo',
         @Query('limite') limite?: string,
-    ) {
+    ): Promise<RankingResponseDto> {
         return this.servidoresService.getRankingServidores(
             ordenarPor,
             ordem,
@@ -48,7 +57,8 @@ export class ServidoresController {
     @Get()
     @ApiOperation({ summary: 'Lista os servidores (do banco de dados ou da API externa via ?origem=externa)' })
     @ApiQuery({ name: 'origem', required: false, enum: ['banco', 'externa'], description: 'Fonte dos dados (padrão: banco)' })
-    async listServidores(@Query('origem') origem?: string) {
+    @ApiResponse({ status: 200, description: 'Lista de servidores com metadados regionais e última coleta', type: [ServidorComRegiaoDto] })
+    async listServidores(@Query('origem') origem?: string): Promise<any> {
         if (origem === 'externa') {
             return this.servidoresService.listServidores();
         }
@@ -60,10 +70,11 @@ export class ServidoresController {
     @ApiOperation({ summary: 'Série temporal das medições de um servidor para gráficos' })
     @ApiParam({ name: 'id', description: 'ID do servidor (ex: billing-api)' })
     @ApiQuery({ name: 'limite', required: false, description: 'Quantidade máxima de pontos (padrão: 30)' })
+    @ApiResponse({ status: 200, description: 'Pontos históricos de telemetria do servidor', type: HistoricoServidorResponseDto })
     async getHistoricoServidor(
         @Param('id') id: string,
         @Query('limite') limite?: string,
-    ) {
+    ): Promise<HistoricoServidorResponseDto> {
         return this.servidoresService.getHistoricoServidor(id, Number(limite) || 30);
     }
 
@@ -71,6 +82,7 @@ export class ServidoresController {
     @Get(':id')
     @ApiOperation({ summary: 'Consulta os dados cadastrais de um servidor específico direto na API externa' })
     @ApiParam({ name: 'id', description: 'ID do servidor' })
+    @ApiResponse({ status: 200, description: 'Dados cadastrais do servidor' })
     async servidorById(@Param('id') id: string) {
         return this.servidoresService.servidorById(id);
     }
@@ -79,6 +91,7 @@ export class ServidoresController {
     @Get(':id/metrics')
     @ApiOperation({ summary: 'Consulta as métricas brutas em tempo real do servidor na API externa' })
     @ApiParam({ name: 'id', description: 'ID do servidor' })
+    @ApiResponse({ status: 200, description: 'Métricas brutas em tempo real do servidor' })
     async metricsServidor(@Param('id') id: string) {
         return this.servidoresService.metricsServidor(id);
     }

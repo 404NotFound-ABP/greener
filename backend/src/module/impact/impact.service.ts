@@ -263,7 +263,10 @@ export class ImpactService {
   }
 
   // Detalhamento do impacto discriminado por métrica (CPU, Memória, Disco, Rede)
-  async calcularImpactoDiscriminadoPorServidor(idServidor: string): Promise<ServidorImpactoDiscriminadoResponseDto> {
+  async calcularImpactoDiscriminadoPorServidor(
+    idServidor: string,
+    criterio: 'instantaneo' | 'acumulado' = 'instantaneo',
+  ): Promise<ServidorImpactoDiscriminadoResponseDto> {
     // 1. Busca dados cadastrais do servidor
     let servidor;
     let servidorDb: typeof schema.servidores.$inferSelect | undefined = undefined;
@@ -310,7 +313,130 @@ export class ImpactService {
       renewable_share_percent: carbono?.renewable_share_percent ?? Number(regiaoDb?.renewableSharePercent ?? 0),
     };
 
-    // 3. Tenta coletar métricas em tempo real
+    const statusAtual = servidorDb?.statusAtual ?? (servidor ? 'disponivel' : 'indisponivel');
+
+    // 3. Critério ACUMULADO: agrega todas as coletas históricas registradas no banco
+    if (criterio === 'acumulado') {
+      const coletas = await this.db
+        .select({
+          cpuPercent: schema.coletasMetricas.cpuPercent,
+          memoriaGb: schema.coletasMetricas.memoriaGb,
+          discoGb: schema.coletasMetricas.discoGb,
+          redeGb: schema.coletasMetricas.redeGb,
+          intervaloSegundos: schema.coletasMetricas.intervaloSegundos,
+          carbonIntensityFator: schema.coletasMetricas.carbonIntensityFator,
+        })
+        .from(schema.coletasMetricas)
+        .where(eq(schema.coletasMetricas.servidorId, idServidor));
+
+      if (coletas.length > 0) {
+        let totalEnergiaCpu = 0;
+        let totalEnergiaRam = 0;
+        let totalEnergiaDisco = 0;
+        let totalEnergiaRede = 0;
+
+        let totalEmissoesCpu = 0;
+        let totalEmissoesRam = 0;
+        let totalEmissoesDisco = 0;
+        let totalEmissoesRede = 0;
+
+        let somaPotenciaCpu = 0;
+        let somaPotenciaRam = 0;
+        let somaPotenciaDisco = 0;
+        let somaPotenciaRede = 0;
+
+        let somaCpuPercent = 0;
+        let somaRamGb = 0;
+        let somaDiskGb = 0;
+        let somaRedeGb = 0;
+
+        for (const c of coletas) {
+          const cpu = Number(c.cpuPercent ?? 0);
+          const ram = Number(c.memoriaGb ?? 0);
+          const disk = Number(c.discoGb ?? 0);
+          const rede = Number(c.redeGb ?? 0);
+          const dtHoras = Number(c.intervaloSegundos ?? 30) / 3600;
+          const ci = Number(c.carbonIntensityFator ?? regiaoInfo.carbon_intensity_gco2e_kwh);
+
+          const pCpu = (cpu / 100) * CalculadoraImpacto.CPU_MAX_WATTS;
+          const pRam = ram * CalculadoraImpacto.RAM_WATTS_PER_GB;
+          const pDisk = disk * CalculadoraImpacto.DISK_WATTS_PER_GB;
+          const pRede = rede * CalculadoraImpacto.NETWORK_WATTS_PER_GB;
+
+          const eCpu = (pCpu * dtHoras) / 1000;
+          const eRam = (pRam * dtHoras) / 1000;
+          const eDisk = (pDisk * dtHoras) / 1000;
+          const eRede = (pRede * dtHoras) / 1000;
+
+          totalEnergiaCpu += eCpu;
+          totalEnergiaRam += eRam;
+          totalEnergiaDisco += eDisk;
+          totalEnergiaRede += eRede;
+
+          totalEmissoesCpu += eCpu * ci;
+          totalEmissoesRam += eRam * ci;
+          totalEmissoesDisco += eDisk * ci;
+          totalEmissoesRede += eRede * ci;
+
+          somaPotenciaCpu += pCpu;
+          somaPotenciaRam += pRam;
+          somaPotenciaDisco += pDisk;
+          somaPotenciaRede += pRede;
+
+          somaCpuPercent += cpu;
+          somaRamGb += ram;
+          somaDiskGb += disk;
+          somaRedeGb += rede;
+        }
+
+        const n = coletas.length;
+        const totalEnergiaKwh = totalEnergiaCpu + totalEnergiaRam + totalEnergiaDisco + totalEnergiaRede;
+        const totalEmissoesGco2e = totalEmissoesCpu + totalEmissoesRam + totalEmissoesDisco + totalEmissoesRede;
+        const potenciaMediaWatts = (somaPotenciaCpu + somaPotenciaRam + somaPotenciaDisco + somaPotenciaRede) / n;
+
+        const calcItemAcumulado = (
+          pTotalEnergia: number,
+          pTotalEmissoes: number,
+          somaPotencia: number,
+          somaBruto: number,
+          unidade: string,
+        ) => {
+          const pct = totalEnergiaKwh > 0 ? Number(((pTotalEnergia / totalEnergiaKwh) * 100).toFixed(2)) : 0;
+          return {
+            valor_bruto: Number((somaBruto / n).toFixed(2)),
+            unidade,
+            potencia_watts: Number((somaPotencia / n).toFixed(2)),
+            energia_kwh: Number(pTotalEnergia.toFixed(7)),
+            emissoes_gco2e: Number(pTotalEmissoes.toFixed(4)),
+            percentual_impacto: pct,
+          };
+        };
+
+        return {
+          servidor_id: idServidor,
+          nome,
+          status: statusAtual,
+          criterio: 'acumulado',
+          origem: 'banco_historico',
+          total_coletas: n,
+          regiao: regiaoInfo,
+          intervalo_segundos: 30,
+          totais: {
+            potencia_watts: Number(potenciaMediaWatts.toFixed(2)),
+            energia_kwh: Number(totalEnergiaKwh.toFixed(7)),
+            emissoes_gco2e: Number(totalEmissoesGco2e.toFixed(4)),
+          },
+          discriminacao: {
+            cpu: calcItemAcumulado(totalEnergiaCpu, totalEmissoesCpu, somaPotenciaCpu, somaCpuPercent, '%'),
+            memoria: calcItemAcumulado(totalEnergiaRam, totalEmissoesRam, somaPotenciaRam, somaRamGb, 'GB'),
+            disco: calcItemAcumulado(totalEnergiaDisco, totalEmissoesDisco, somaPotenciaDisco, somaDiskGb, 'GB'),
+            rede: calcItemAcumulado(totalEnergiaRede, totalEmissoesRede, somaPotenciaRede, somaRedeGb, 'GB'),
+          },
+        };
+      }
+    }
+
+    // 4. Critério INSTANTÂNEO (padrão): Tenta coletar métricas em tempo real
     let metricasData: ServidorMetricsData | null = null;
     if (servidor) {
       try {
@@ -336,6 +462,7 @@ export class ImpactService {
         servidor_id: idServidor,
         nome,
         status: 'disponivel',
+        criterio: 'instantaneo',
         origem: 'tempo_real',
         regiao: regiaoInfo,
         intervalo_segundos: collection_interval_seconds,
@@ -352,8 +479,6 @@ export class ImpactService {
       .orderBy(desc(schema.coletasMetricas.coletadoEm))
       .limit(1);
 
-    const statusAtual = servidorDb?.statusAtual ?? 'indisponivel';
-
     if (ultimaColeta) {
       const calc = CalculadoraImpacto.calcularDiscriminado(
         30,
@@ -368,6 +493,7 @@ export class ImpactService {
         servidor_id: idServidor,
         nome,
         status: statusAtual,
+        criterio: 'instantaneo',
         origem: 'banco_historico',
         regiao: regiaoInfo,
         intervalo_segundos: 30,
@@ -380,6 +506,7 @@ export class ImpactService {
       servidor_id: idServidor,
       nome,
       status: statusAtual,
+      criterio: criterio,
       origem: 'indisponivel',
       regiao: regiaoInfo,
       intervalo_segundos: 0,
