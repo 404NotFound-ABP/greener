@@ -142,22 +142,37 @@ O monitoramento contínuo é orquestrado pelo módulo `@nestjs/schedule` em conj
 
 ---
 
-### 1. Como Consultar `/services`
+---
 
-* **Origem Externa:** `https://metrics.unilaunch.org/services`
-* **Endpoint Interno (GreenER):** `GET /api/servidores`
-* **Método HTTP:** `GET`
-* **Autenticação:** Não requer autenticação.
-* **Headers:** `Accept: application/json`
+## 🌐 Endpoints Disponíveis para o Frontend
 
-#### Exemplo de Chamada (cURL):
-```bash
-# Consulta direta ao backend GreenER
-curl -X GET http://localhost:3000/api/servidores
+Abaixo estão todos os endpoints implementados e prontos para consumo da aplicação:
 
-# Consulta direta à API externa de métricas
-curl -X GET https://metrics.unilaunch.org/services
-```
+### 1. Servidores e Métricas (`/api/servidores`)
+
+| Método | Rota | Descrição | Parâmetros / Query |
+|---|---|---|---|
+| `GET` | `/api/servidores/dashboard` | Visão consolidada para o Dashboard principal: contadores de status (disponíveis, indisponíveis, removidos), totais acumulados de energia e emissões, potência instantânea total e lista completa de servidores com última telemetria. | N/A |
+| `GET` | `/api/servidores/ranking` | **Ranking de servidores** por maiores emissões ou consumo elétrico (**US13 / RF14**). | `?ordenarPor=emissoes` ou `energia`<br>`?criterio=acumulado` (histórico no banco) ou `instantaneo` (última coleta)<br>`?ordem=desc` ou `asc`<br>`?limite=10` |
+| `GET` | `/api/servidores/comparativo` | Comparativo lado a lado de consumo e impacto entre serviços. | `?ids=billing-api,checkout-worker` (opcional; padrão compara todos) |
+| `GET` | `/api/servidores/:id/historico` | **Série temporal histórica** de medições de um servidor específico para alimentar gráficos de linha (W, kWh, gCO₂e, CPU, RAM, Disco, Rede). | `:id` (ID do servidor)<br>`?limite=30` (padrão: 30 pontos cronológicos) |
+| `GET` | `/api/servidores` | Lista cadastral de servidores salvos no banco ou direto da API externa. | `?origem=banco` (padrão) ou `?origem=externa` |
+| `GET` | `/api/servidores/:id` | Consulta dados cadastrais de um servidor específico. | `:id` (ID do servidor) |
+| `GET` | `/api/servidores/:id/metrics` | Consulta métricas brutas em tempo real direto da API externa. | `:id` (ID do servidor) |
+
+### 2. Impacto Ambiental e Pegada de Carbono (`/api/impacto`)
+
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET` | `/api/impacto` | Calcula o impacto ambiental instantâneo de **todos os servidores** em lote. |
+| `GET` | `/api/impacto/:id` | Calcula o impacto ambiental detalhado de um servidor específico (CPU, Memória, Disco, Rede, Potência em Watts, Energia em kWh e Emissões em gCO₂e). |
+
+### 3. Fatores de Carbono Regionais (`/api/carbon`)
+
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET` | `/api/carbon/regioes` | Lista as 5 regiões mundiais sincronizadas no banco com intensidade de carbono (`gCO2e/kWh`) e percentual de energia renovável. |
+| `GET` | `/api/carbon/regioes/:code` | Consulta os fatores de carbono de uma região específica (ex: `br-sudeste`, `us-east`). |
 
 ---
 

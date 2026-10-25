@@ -8,6 +8,13 @@ import { ServidorImpactoResponseDto } from './dto/impact.dto';
 export class ImpactController {
   constructor(private readonly impactService: ImpactService) {}
 
+  @Get()
+  @ApiOperation({ summary: 'Calcula em tempo real a potência (W), energia (kWh) e emissões (gCO2e) de todos os servidores ativos' })
+  @ApiResponse({ status: 200, description: 'Lista com o cálculo de impacto ambiental de todos os servidores', type: [ServidorImpactoResponseDto] })
+  async getImpactoTodos(): Promise<ServidorImpactoResponseDto[]> {
+    return this.impactService.calcularImpactoTodos();
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Calcula em tempo real a potência (W), energia (kWh) e emissões (gCO2e) do servidor' })
   @ApiParam({ name: 'id', description: 'ID do servidor (ex: billing-api)', example: 'billing-api' })

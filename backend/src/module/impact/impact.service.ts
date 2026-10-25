@@ -19,7 +19,7 @@ export class CalculadoraImpacto {
     ramGb: number,
     diskGb: number,
     networkGb: number,
-    carbonIntensity: number | null
+    carbonIntensity: number | null,
   ) {
     const pCpu = (cpuPercent / 100) * this.CPU_MAX_WATTS;
     const pRam = ramGb * this.RAM_WATTS_PER_GB;
@@ -45,18 +45,76 @@ export class ImpactService {
   constructor(
     private readonly servidoresService: ServidoresService,
     private readonly carbonService: CarbonService,
+    @Inject(DRIZZLE_PROVIDER) private readonly db: DrizzleDB,
   ) {}
 
   async calcularImpactoPorServidor(idServidor: string): Promise<ServidorImpactoResponseDto> {
-    // 1. Dados cadastrais do servidor (lança 404 se não for encontrado)
-    const servidor = await this.servidoresService.servidorById(idServidor);
-
-    // 2. Consulta a intensidade de carbono da região
-    let carbono: CarbonIntensityResponse | null = null;
+    // 1. Busca dados cadastrais do servidor
+    let servidor;
     try {
-      carbono = await this.carbonService.getCarbonIntensityById(servidor.location.region_code);
+      servidor = await this.servidoresService.servidorById(idServidor);
+    } catch (err: any) {
+      // Se não encontrou na API externa (404), verifica se é um servidor previamente cadastrado no banco (removido)
+      const [servidorDb] = await this.db
+        .select()
+        .from(schema.servidores)
+        .where(eq(schema.servidores.id, idServidor))
+        .limit(1);
+
+      if (servidorDb && (servidorDb.statusAtual === 'removido' || !servidorDb.ativo)) {
+        let regiaoDb: typeof schema.regioes.$inferSelect | undefined = undefined;
+        if (servidorDb.codigoRegiao) {
+          const [r] = await this.db
+            .select()
+            .from(schema.regioes)
+            .where(eq(schema.regioes.codigo, servidorDb.codigoRegiao))
+            .limit(1);
+          regiaoDb = r;
+        }
+
+        return {
+          servidor_id: servidorDb.id,
+          nome: servidorDb.nome,
+          status: 'removido',
+          regiao: {
+            codigo: servidorDb.codigoRegiao ?? '',
+            pais: regiaoDb?.pais ?? '',
+            cidade: regiaoDb?.cidade ?? null,
+            carbon_intensity_gco2e_kwh: Number(regiaoDb?.carbonIntensityGco2eKwh ?? 0),
+            renewable_share_percent: Number(regiaoDb?.renewableSharePercent ?? 0),
+          },
+          metricas: null,
+          impacto: null,
+        };
+      }
+
+      // Se não existir nem no banco de dados, lança 404 Not Found
+      throw new NotFoundException(`Servidor com ID '${idServidor}' não encontrado`);
+    }
+
+    // 2. Consulta a intensidade de carbono da região (com fallback para cache no banco)
+    let carbono: CarbonIntensityResponse | null = null;
+    const regionCode = servidor.location.region_code;
+    try {
+      carbono = await this.carbonService.getCarbonIntensityById(regionCode);
     } catch {
-      console.warn(`Não foi possível obter fator de carbono para região: ${servidor.location.region_code}`);
+      // Tenta fallback para a tabela de regiões no banco
+      const [regiaoSalva] = await this.db
+        .select()
+        .from(schema.regioes)
+        .where(eq(schema.regioes.codigo, regionCode))
+        .limit(1);
+
+      if (regiaoSalva) {
+        carbono = {
+          region_code: regiaoSalva.codigo,
+          country: regiaoSalva.pais,
+          region: regiaoSalva.regiao,
+          city: regiaoSalva.cidade,
+          carbon_intensity_gco2e_per_kwh: Number(regiaoSalva.carbonIntensityGco2eKwh),
+          renewable_share_percent: Number(regiaoSalva.renewableSharePercent),
+        };
+      }
     }
 
     const regiaoInfo = {
@@ -103,7 +161,7 @@ export class ImpactService {
       metrics.memory_gb,
       metrics.disk_gb,
       metrics.network_gb,
-      carbono ? carbono.carbon_intensity_gco2e_per_kwh : null
+      carbono ? carbono.carbon_intensity_gco2e_per_kwh : null,
     );
 
     return {
@@ -124,5 +182,35 @@ export class ImpactService {
         emissoes_gco2e: resultado.emissoesGco2e,
       },
     };
+  }
+
+  // Calcula em lote o impacto de todos os servidores ativos
+  async calcularImpactoTodos(): Promise<ServidorImpactoResponseDto[]> {
+    const servidores = await this.servidoresService.listServidores();
+    const resultados: ServidorImpactoResponseDto[] = [];
+
+    for (const s of servidores) {
+      try {
+        const impacto = await this.calcularImpactoPorServidor(s.id);
+        resultados.push(impacto);
+      } catch {
+        resultados.push({
+          servidor_id: s.id,
+          nome: s.name,
+          status: 'indisponivel',
+          regiao: {
+            codigo: s.location?.region_code ?? '',
+            pais: s.location?.country ?? '',
+            cidade: s.location?.city ?? null,
+            carbon_intensity_gco2e_kwh: 0,
+            renewable_share_percent: 0,
+          },
+          metricas: null,
+          impacto: null,
+        });
+      }
+    }
+
+    return resultados;
   }
 }

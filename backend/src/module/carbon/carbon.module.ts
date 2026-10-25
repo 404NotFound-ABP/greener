@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { CarbonService } from './carbon.service';
 
+import { CarbonController } from './carbon.controller';
+
 @Module({
   imports: [
     HttpModule.register({
@@ -9,6 +11,7 @@ import { CarbonService } from './carbon.service';
       maxRedirects: 3,
     }),
   ],
+  controllers: [CarbonController],
   providers: [CarbonService],
   exports: [CarbonService],
 })
