@@ -41,8 +41,8 @@ export class CalculosImpactoDto {
   @ApiProperty({ example: 0.0003815, description: 'Consumo de energia no período em kWh' })
   energia_kwh!: number;
 
-  @ApiProperty({ example: 0.0324, description: 'Emissão de CO2 equivalente gerada em gCO2e' })
-  emissoes_gco2e!: number;
+  @ApiProperty({ example: 0.0324, description: 'Emissão de CO2 equivalente gerada em gCO2e', nullable: true })
+  emissoes_gco2e!: number | null;
 }
 
 export class ServidorImpactoResponseDto {
@@ -58,9 +58,9 @@ export class ServidorImpactoResponseDto {
   @ApiProperty({ type: RegiaoDetalhesDto })
   regiao!: RegiaoDetalhesDto;
 
-  @ApiProperty({ type: MetricasUsoDto })
-  metricas!: MetricasUsoDto;
+  @ApiProperty({ type: MetricasUsoDto, nullable: true })
+  metricas!: MetricasUsoDto | null;
 
-  @ApiProperty({ type: CalculosImpactoDto })
-  impacto!: CalculosImpactoDto;
+  @ApiProperty({ type: CalculosImpactoDto, nullable: true })
+  impacto!: CalculosImpactoDto | null;
 }
