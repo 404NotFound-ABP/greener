@@ -52,7 +52,7 @@ export class ServidorImpactoResponseDto {
   @ApiProperty({ example: 'Billing API' })
   nome!: string;
 
-  @ApiProperty({ example: 'disponivel', enum: ['disponivel', 'indisponivel', 'sem_metricas'] })
+  @ApiProperty({ example: 'disponivel', enum: ['disponivel', 'indisponivel', 'removido'] })
   status!: string;
 
   @ApiProperty({ type: RegiaoDetalhesDto })

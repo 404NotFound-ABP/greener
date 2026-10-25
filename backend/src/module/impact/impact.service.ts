@@ -1,9 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { ServidoresService } from '@/module/servidores/servidores.service';
 import { CarbonService } from '@/module/carbon/carbon.service';
 import { CarbonIntensityResponse } from '@/module/interface/carbon.interface';
 import { ServidorMetricsData } from '@/module/interface/servidor.interface';
 import { ServidorImpactoResponseDto } from './dto/impact.dto';
+import { DRIZZLE_PROVIDER, DrizzleDB, schema } from '@/database';
+import { eq } from 'drizzle-orm';
 
 export class CalculadoraImpacto {
   private static readonly CPU_MAX_WATTS = 100;
@@ -81,12 +83,12 @@ export class ImpactService {
       };
     }
 
-    // 4. Se o serviço responder, mas não contiver as métricas esperadas: "sem_metricas"
+    // 4. Se o serviço responder, mas não contiver as métricas esperadas: "indisponivel"
     if (!metricasData || !metricasData.metrics) {
       return {
         servidor_id: servidor.id,
         nome: servidor.name,
-        status: 'sem_metricas',
+        status: 'indisponivel',
         regiao: regiaoInfo,
         metricas: null,
         impacto: null,
