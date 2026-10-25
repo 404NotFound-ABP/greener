@@ -64,3 +64,64 @@ export class ServidorImpactoResponseDto {
   @ApiProperty({ type: CalculosImpactoDto, nullable: true })
   impacto!: CalculosImpactoDto | null;
 }
+
+export class MetricaDiscriminadaDto {
+  @ApiProperty({ example: 75.5, description: 'Valor bruto medido' })
+  valor_bruto!: number;
+
+  @ApiProperty({ example: '%', description: 'Unidade de medição (%, GB)' })
+  unidade!: string;
+
+  @ApiProperty({ example: 75.5, description: 'Potência calculada gerada por este recurso em Watts' })
+  potencia_watts!: number;
+
+  @ApiProperty({ example: 0.000629, description: 'Energia consumida por este recurso em kWh' })
+  energia_kwh!: number;
+
+  @ApiProperty({ example: 0.2378, description: 'Emissões de carbono geradas por este recurso em gCO2e', nullable: true })
+  emissoes_gco2e!: number | null;
+
+  @ApiProperty({ example: 92.45, description: 'Participação percentual deste recurso no consumo total (%)' })
+  percentual_impacto!: number;
+}
+
+export class DiscriminacaoImpactoDto {
+  @ApiProperty({ type: MetricaDiscriminadaDto })
+  cpu!: MetricaDiscriminadaDto;
+
+  @ApiProperty({ type: MetricaDiscriminadaDto })
+  memoria!: MetricaDiscriminadaDto;
+
+  @ApiProperty({ type: MetricaDiscriminadaDto })
+  disco!: MetricaDiscriminadaDto;
+
+  @ApiProperty({ type: MetricaDiscriminadaDto })
+  rede!: MetricaDiscriminadaDto;
+}
+
+export class ServidorImpactoDiscriminadoResponseDto {
+  @ApiProperty({ example: 'checkout-worker' })
+  servidor_id!: string;
+
+  @ApiProperty({ example: 'Checkout Worker' })
+  nome!: string;
+
+  @ApiProperty({ example: 'disponivel', enum: ['disponivel', 'indisponivel', 'removido'] })
+  status!: string;
+
+  @ApiProperty({ example: 'tempo_real', enum: ['tempo_real', 'banco_historico'] })
+  origem!: string;
+
+  @ApiProperty({ type: RegiaoDetalhesDto })
+  regiao!: RegiaoDetalhesDto;
+
+  @ApiProperty({ example: 30, description: 'Intervalo de medição em segundos' })
+  intervalo_segundos!: number;
+
+  @ApiProperty({ type: CalculosImpactoDto, nullable: true })
+  totais!: CalculosImpactoDto | null;
+
+  @ApiProperty({ type: DiscriminacaoImpactoDto, nullable: true })
+  discriminacao!: DiscriminacaoImpactoDto | null;
+}
+

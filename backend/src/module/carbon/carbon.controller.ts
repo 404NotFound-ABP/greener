@@ -2,7 +2,7 @@ import { Controller, Get, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { CarbonService } from './carbon.service';
 
-@ApiTags('carbono')
+@ApiTags('Frontend - Banco de Dados')
 @Controller('/api/carbon')
 export class CarbonController {
     constructor(private readonly carbonService: CarbonService) {}

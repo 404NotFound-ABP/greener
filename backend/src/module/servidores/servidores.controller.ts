@@ -2,11 +2,11 @@ import { Controller, Get, Param, Query } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from "@nestjs/swagger";
 import { ServidoresService } from "./servidores.service";
 
-@ApiTags('servidores')
 @Controller('/api/servidores')
 export class ServidoresController {
     constructor(private readonly servidoresService: ServidoresService) {}
 
+    @ApiTags('Frontend - Banco de Dados')
     @Get('dashboard')
     @ApiOperation({ summary: 'Dados consolidados para o dashboard do frontend (resumo + servidores + última telemetria)' })
     @ApiResponse({ status: 200, description: 'Resumo geral e lista de servidores com última coleta' })
@@ -14,6 +14,7 @@ export class ServidoresController {
         return this.servidoresService.getDashboardData();
     }
 
+    @ApiTags('Frontend - Banco de Dados')
     @Get('comparativo')
     @ApiOperation({ summary: 'Compara consumo de energia e emissões entre servidores' })
     @ApiQuery({ name: 'ids', required: false, description: 'IDs dos servidores separados por vírgula (ex: billing-api,checkout-worker)' })
@@ -22,6 +23,7 @@ export class ServidoresController {
         return this.servidoresService.getComparativo(idList);
     }
 
+    @ApiTags('Frontend - Banco de Dados')
     @Get('ranking')
     @ApiOperation({ summary: 'Ranking de servidores por maiores emissões ou consumo de energia.' })
     @ApiQuery({ name: 'ordenarPor', required: false, enum: ['emissoes', 'energia'], description: 'Critério de ordenação (padrão: emissoes)' })
@@ -42,6 +44,7 @@ export class ServidoresController {
         );
     }
 
+    @ApiTags('Frontend - Banco de Dados')
     @Get()
     @ApiOperation({ summary: 'Lista os servidores (do banco de dados ou da API externa via ?origem=externa)' })
     @ApiQuery({ name: 'origem', required: false, enum: ['banco', 'externa'], description: 'Fonte dos dados (padrão: banco)' })
@@ -52,6 +55,7 @@ export class ServidoresController {
         return this.servidoresService.listServidoresDoBanco();
     }
 
+    @ApiTags('Frontend - Banco de Dados')
     @Get(':id/historico')
     @ApiOperation({ summary: 'Série temporal das medições de um servidor para gráficos' })
     @ApiParam({ name: 'id', description: 'ID do servidor (ex: billing-api)' })
@@ -63,13 +67,15 @@ export class ServidoresController {
         return this.servidoresService.getHistoricoServidor(id, Number(limite) || 30);
     }
 
+    @ApiTags('APIs Externas - Tempo Real')
     @Get(':id')
-    @ApiOperation({ summary: 'Consulta os dados cadastrais de um servidor específico' })
+    @ApiOperation({ summary: 'Consulta os dados cadastrais de um servidor específico direto na API externa' })
     @ApiParam({ name: 'id', description: 'ID do servidor' })
     async servidorById(@Param('id') id: string) {
         return this.servidoresService.servidorById(id);
     }
 
+    @ApiTags('APIs Externas - Tempo Real')
     @Get(':id/metrics')
     @ApiOperation({ summary: 'Consulta as métricas brutas em tempo real do servidor na API externa' })
     @ApiParam({ name: 'id', description: 'ID do servidor' })

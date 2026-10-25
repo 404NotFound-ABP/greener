@@ -165,7 +165,8 @@ Abaixo estão todos os endpoints implementados e prontos para consumo da aplica�
 | Método | Rota | Descrição |
 |---|---|---|
 | `GET` | `/api/impacto` | Calcula o impacto ambiental instantâneo de **todos os servidores** em lote. |
-| `GET` | `/api/impacto/:id` | Calcula o impacto ambiental detalhado de um servidor específico (CPU, Memória, Disco, Rede, Potência em Watts, Energia em kWh e Emissões em gCO₂e). |
+| `GET` | `/api/impacto/:id` | Calcula o impacto ambiental consolidado de um servidor específico (Potência em Watts, Energia em kWh e Emissões em gCO₂e). |
+| `GET` | `/api/impacto/:id/discriminado` | **Detalhamento do impacto discriminado por métrica** (CPU, Memória, Disco, Rede): calcula individualmente para cada recurso seus Watts, kWh consumidos, gCO₂e emitidos e **% de participação no impacto total** . |
 
 ### 3. Fatores de Carbono Regionais (`/api/carbon`)
 

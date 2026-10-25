@@ -2,7 +2,7 @@ import { Controller, Get, Post, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { CollectorService } from './collector.service';
 
-@ApiTags('coleta-agendada')
+@ApiTags('Coleta e Agendamento')
 @Controller('api/coleta')
 export class CollectorController {
   constructor(private readonly collectorService: CollectorService) {}

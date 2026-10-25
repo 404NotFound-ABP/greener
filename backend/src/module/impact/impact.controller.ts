@@ -1,13 +1,23 @@
 import { Controller, Get, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { ImpactService } from './impact.service';
-import { ServidorImpactoResponseDto } from './dto/impact.dto';
+import { ServidorImpactoResponseDto, ServidorImpactoDiscriminadoResponseDto } from './dto/impact.dto';
 
-@ApiTags('impacto-ambiental')
 @Controller('/api/impacto')
 export class ImpactController {
   constructor(private readonly impactService: ImpactService) {}
 
+  @ApiTags('Frontend - Banco de Dados')
+  @Get(':id/discriminado')
+  @ApiOperation({ summary: 'Detalhamento do consumo e emissões de carbono discriminados por métrica (CPU, Memória, Disco, Rede)' })
+  @ApiParam({ name: 'id', description: 'ID do servidor (ex: billing-api)', example: 'billing-api' })
+  @ApiResponse({ status: 200, description: 'Cálculo de impacto ambiental discriminado por recurso', type: ServidorImpactoDiscriminadoResponseDto })
+  @ApiResponse({ status: 404, description: 'Servidor não encontrado' })
+  async getImpactoDiscriminado(@Param('id') id: string): Promise<ServidorImpactoDiscriminadoResponseDto> {
+    return this.impactService.calcularImpactoDiscriminadoPorServidor(id);
+  }
+
+  @ApiTags('APIs Externas - Tempo Real')
   @Get()
   @ApiOperation({ summary: 'Calcula em tempo real a potência (W), energia (kWh) e emissões (gCO2e) de todos os servidores ativos' })
   @ApiResponse({ status: 200, description: 'Lista com o cálculo de impacto ambiental de todos os servidores', type: [ServidorImpactoResponseDto] })
@@ -15,6 +25,7 @@ export class ImpactController {
     return this.impactService.calcularImpactoTodos();
   }
 
+  @ApiTags('APIs Externas - Tempo Real')
   @Get(':id')
   @ApiOperation({ summary: 'Calcula em tempo real a potência (W), energia (kWh) e emissões (gCO2e) do servidor' })
   @ApiParam({ name: 'id', description: 'ID do servidor (ex: billing-api)', example: 'billing-api' })

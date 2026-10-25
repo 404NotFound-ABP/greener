@@ -3,9 +3,9 @@ import { ServidoresService } from '@/module/servidores/servidores.service';
 import { CarbonService } from '@/module/carbon/carbon.service';
 import { CarbonIntensityResponse } from '@/module/interface/carbon.interface';
 import { ServidorMetricsData } from '@/module/interface/servidor.interface';
-import { ServidorImpactoResponseDto } from './dto/impact.dto';
+import { ServidorImpactoResponseDto, ServidorImpactoDiscriminadoResponseDto } from './dto/impact.dto';
 import { DRIZZLE_PROVIDER, DrizzleDB, schema } from '@/database';
-import { eq } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 
 export class CalculadoraImpacto {
   private static readonly CPU_MAX_WATTS = 100;
@@ -36,6 +36,54 @@ export class CalculadoraImpacto {
       potenciaWatts: Number(potenciaWatts.toFixed(2)),
       energiaKwh: Number(energiaKwh.toFixed(7)),
       emissoesGco2e,
+    };
+  }
+
+  static calcularDiscriminado(
+    intervaloSegundos: number,
+    cpuPercent: number,
+    ramGb: number,
+    diskGb: number,
+    networkGb: number,
+    carbonIntensity: number | null,
+  ) {
+    const pCpu = (cpuPercent / 100) * this.CPU_MAX_WATTS;
+    const pRam = ramGb * this.RAM_WATTS_PER_GB;
+    const pDisk = diskGb * this.DISK_WATTS_PER_GB;
+    const pRede = networkGb * this.NETWORK_WATTS_PER_GB;
+    const potenciaTotal = pCpu + pRam + pDisk + pRede;
+
+    const tempoHoras = intervaloSegundos / 3600;
+
+    const calcItem = (pItem: number, valorBruto: number, unidade: string) => {
+      const eKwh = (pItem * tempoHoras) / 1000;
+      const emissoes = carbonIntensity != null ? Number((eKwh * carbonIntensity).toFixed(4)) : null;
+      const pct = potenciaTotal > 0 ? Number(((pItem / potenciaTotal) * 100).toFixed(2)) : 0;
+      return {
+        valor_bruto: Number(valorBruto.toFixed(2)),
+        unidade,
+        potencia_watts: Number(pItem.toFixed(2)),
+        energia_kwh: Number(eKwh.toFixed(7)),
+        emissoes_gco2e: emissoes,
+        percentual_impacto: pct,
+      };
+    };
+
+    const totalEnergiaKwh = (potenciaTotal * tempoHoras) / 1000;
+    const totalEmissoesGco2e = carbonIntensity != null ? Number((totalEnergiaKwh * carbonIntensity).toFixed(4)) : null;
+
+    return {
+      totais: {
+        potencia_watts: Number(potenciaTotal.toFixed(2)),
+        energia_kwh: Number(totalEnergiaKwh.toFixed(7)),
+        emissoes_gco2e: totalEmissoesGco2e,
+      },
+      discriminacao: {
+        cpu: calcItem(pCpu, cpuPercent, '%'),
+        memoria: calcItem(pRam, ramGb, 'GB'),
+        disco: calcItem(pDisk, diskGb, 'GB'),
+        rede: calcItem(pRede, networkGb, 'GB'),
+      },
     };
   }
 }
@@ -212,5 +260,131 @@ export class ImpactService {
     }
 
     return resultados;
+  }
+
+  // Detalhamento do impacto discriminado por métrica (CPU, Memória, Disco, Rede)
+  async calcularImpactoDiscriminadoPorServidor(idServidor: string): Promise<ServidorImpactoDiscriminadoResponseDto> {
+    // 1. Busca dados cadastrais do servidor
+    let servidor;
+    let servidorDb: typeof schema.servidores.$inferSelect | undefined = undefined;
+
+    try {
+      servidor = await this.servidoresService.servidorById(idServidor);
+    } catch {
+      const [sDb] = await this.db
+        .select()
+        .from(schema.servidores)
+        .where(eq(schema.servidores.id, idServidor))
+        .limit(1);
+      servidorDb = sDb;
+      if (!servidorDb) {
+        throw new NotFoundException(`Servidor com ID '${idServidor}' não encontrado`);
+      }
+    }
+
+    const nome = servidor?.name ?? servidorDb?.nome ?? idServidor;
+    const regionCode = servidor?.location?.region_code ?? servidorDb?.codigoRegiao ?? '';
+
+    // 2. Busca intensidade de carbono
+    let carbono: CarbonIntensityResponse | null = null;
+    let regiaoDb: typeof schema.regioes.$inferSelect | undefined = undefined;
+
+    if (regionCode) {
+      try {
+        carbono = await this.carbonService.getCarbonIntensityById(regionCode);
+      } catch {
+        const [r] = await this.db
+          .select()
+          .from(schema.regioes)
+          .where(eq(schema.regioes.codigo, regionCode))
+          .limit(1);
+        regiaoDb = r;
+      }
+    }
+
+    const regiaoInfo = {
+      codigo: regionCode,
+      pais: servidor?.location?.country ?? regiaoDb?.pais ?? '',
+      cidade: servidor?.location?.city ?? regiaoDb?.cidade ?? null,
+      carbon_intensity_gco2e_kwh: carbono?.carbon_intensity_gco2e_per_kwh ?? Number(regiaoDb?.carbonIntensityGco2eKwh ?? 0),
+      renewable_share_percent: carbono?.renewable_share_percent ?? Number(regiaoDb?.renewableSharePercent ?? 0),
+    };
+
+    // 3. Tenta coletar métricas em tempo real
+    let metricasData: ServidorMetricsData | null = null;
+    if (servidor) {
+      try {
+        metricasData = await this.servidoresService.metricsServidor(idServidor);
+      } catch {
+        // Ignora falha de tempo real e tenta buscar última coleta no banco
+      }
+    }
+
+    // Se temos métricas em tempo real:
+    if (metricasData && metricasData.metrics) {
+      const { collection_interval_seconds, metrics } = metricasData;
+      const calc = CalculadoraImpacto.calcularDiscriminado(
+        collection_interval_seconds,
+        metrics.cpu_percent,
+        metrics.memory_gb,
+        metrics.disk_gb,
+        metrics.network_gb,
+        regiaoInfo.carbon_intensity_gco2e_kwh,
+      );
+
+      return {
+        servidor_id: idServidor,
+        nome,
+        status: 'disponivel',
+        origem: 'tempo_real',
+        regiao: regiaoInfo,
+        intervalo_segundos: collection_interval_seconds,
+        totais: calc.totais,
+        discriminacao: calc.discriminacao,
+      };
+    }
+
+    // Caso contrário (servidor indisponível ou removido), busca a última coleta gravada no banco
+    const [ultimaColeta] = await this.db
+      .select()
+      .from(schema.coletasMetricas)
+      .where(eq(schema.coletasMetricas.servidorId, idServidor))
+      .orderBy(desc(schema.coletasMetricas.coletadoEm))
+      .limit(1);
+
+    const statusAtual = servidorDb?.statusAtual ?? 'indisponivel';
+
+    if (ultimaColeta) {
+      const calc = CalculadoraImpacto.calcularDiscriminado(
+        30,
+        Number(ultimaColeta.cpuPercent ?? 0),
+        Number(ultimaColeta.memoriaGb ?? 0),
+        Number(ultimaColeta.discoGb ?? 0),
+        Number(ultimaColeta.redeGb ?? 0),
+        Number(ultimaColeta.carbonIntensityFator ?? regiaoInfo.carbon_intensity_gco2e_kwh),
+      );
+
+      return {
+        servidor_id: idServidor,
+        nome,
+        status: statusAtual,
+        origem: 'banco_historico',
+        regiao: regiaoInfo,
+        intervalo_segundos: 30,
+        totais: calc.totais,
+        discriminacao: calc.discriminacao,
+      };
+    }
+
+    return {
+      servidor_id: idServidor,
+      nome,
+      status: statusAtual,
+      origem: 'indisponivel',
+      regiao: regiaoInfo,
+      intervalo_segundos: 0,
+      totais: null,
+      discriminacao: null,
+    };
   }
 }
