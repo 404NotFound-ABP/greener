@@ -5,7 +5,7 @@ services:
     container_name: greener-db
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: [PASSWORD]
+      POSTGRES_PASSWORD: 123
       POSTGRES_DB: greener
     ports:
       - "5433:5432"

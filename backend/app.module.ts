@@ -6,6 +6,8 @@ import { CarbonModule } from '@/module/carbon/carbon.module';
 import { ImpactModule } from '@/module/impact/impact.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { CollectorModule } from '@/module/collector/collector.module';
+import { AuthModule } from '@/module/auth/auth.module';
+import { UsersModule } from '@/module/users/users.module';
 
 @Module({
   imports: [
@@ -15,10 +17,12 @@ import { CollectorModule } from '@/module/collector/collector.module';
     }),
     ScheduleModule.forRoot(),
     DatabaseModule,
+    AuthModule,
+    UsersModule,
     ServidoresModule, 
     CarbonModule, 
     ImpactModule, 
     CollectorModule,
   ],
 })
-export class AppModule {} 
+export class AppModule {}
