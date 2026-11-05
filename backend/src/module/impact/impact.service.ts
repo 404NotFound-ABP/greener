@@ -8,10 +8,10 @@ import { DRIZZLE_PROVIDER, DrizzleDB, schema } from '@/database';
 import { eq, desc } from 'drizzle-orm';
 
 export class CalculadoraImpacto {
-  private static readonly CPU_MAX_WATTS = 100;
-  private static readonly RAM_WATTS_PER_GB = 0.375;
-  private static readonly DISK_WATTS_PER_GB = 0.01;
-  private static readonly NETWORK_WATTS_PER_GB = 0.02;
+  static readonly CPU_MAX_WATTS = 100;
+  static readonly RAM_WATTS_PER_GB = 0.375;
+  static readonly DISK_WATTS_PER_GB = 0.01;
+  static readonly NETWORK_WATTS_PER_GB = 0.02;
 
   static calcular(
     intervaloSegundos: number,
