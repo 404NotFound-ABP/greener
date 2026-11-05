@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: #000;
+}
+
+@theme {
+  /* Tipografia */
+  --font-sans: "Roboto", sans-serif;
+
+  /* Família Verde */
+  --color-verde-950: #062819;
+  --color-verde-900: #0E3B25;
+  --color-verde-850: #0E4D2D;
+  --color-verde-700: #156A3E;
+  --color-verde-650: #0B7335;
+  --color-verde-600: #1F8A4C;
+  --color-verde-500: #2FA862;
+  --color-verde-400: #14C45A;
+  --color-verde-200: #A8DFBD;
+  --color-verde-100: #DDF3E5;
+  --color-verde-50: #F2FAF5;
+
+  /* Família Neutro */
+  --color-neutro-900: #16201A;
+  --color-neutro-600: #5A6B61;
+  --color-neutro-300: #CBD5CE;
+  --color-neutro-50: #F7F9F8;
+  --color-neutro-0: #FFFFFF;
+
+  /* Cores de Estado e Apoio */
+  --color-amarelo-500: #FFD32C;
+  --color-azul-500: #1B76DE;
+  --color-laranja-500: #F24E06;
+  --color-vermelho-500: #9C2A2A;
+}
+
+/* Escala Tipográfica GreenER */
+@layer utilities {
+  .text-display {
+    font-size: 40px;
+    line-height: 48px;
+    font-weight: 700;
+  }
+  .text-h1 {
+    font-size: 32px;
+    line-height: 40px;
+    font-weight: 700;
+  }
+  .text-h2 {
+    font-size: 24px;
+    line-height: 32px;
+    font-weight: 500;
+  }
+  .text-h3 {
+    font-size: 20px;
+    line-height: 28px;
+    font-weight: 500;
+  }
+  .text-body-lg {
+    font-size: 18px;
+    line-height: 28px;
+    font-weight: 400;
+  }
+  .text-body-base {
+    font-size: 16px;
+    line-height: 24px;
+    font-weight: 400;
+  }
+  .text-body-sm {
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 400;
+  }
+  .text-caption {
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 400;
+  }
+  .text-button {
+    font-size: 16px;
+    line-height: 24px;
+    font-weight: 500;
+  }
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(75, 85, 99, 0.5);
+  border-radius: 4px;
+}
+.theme-dark .leaflet-tile {
+  filter: grayscale(100%) invert(100%) brightness(75%) contrast(120%);
+}
