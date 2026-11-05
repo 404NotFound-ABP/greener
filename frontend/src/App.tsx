@@ -82,11 +82,7 @@ export function App() {
     );
   }
 
-  // ==========================================
-  // DASHBOARD DO UTILIZADOR (MAPA)
-  // ==========================================
-  // Se não for nenhum dos ecrãs acima, renderiza o Mapa (tela final do utilizador)
-  return <MapBackground onLogout={() => setCurrentScreen('login')} />;
+  return <MapBackground />;
 }
 
 export default App;

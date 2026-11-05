@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Tooltip, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import * as L from 'leaflet';
 
 import { ServiceModal } from './ServiceModal';
 import type { ModalServiceData } from './ServiceModal';
@@ -19,7 +20,7 @@ const mapMarkersData: (ModalServiceData & { coords: [number, number] })[] = [
 
 export const MapBackground: React.FC = () => {
   const [currentTheme, setCurrentTheme] = useState<'dark' | 'satellite'>('dark');
-  const [mapInstance, setMapInstance] = useState<any>(null); 
+  const [mapInstance, setMapInstance] = useState<L.Map | null>(null); 
   
   const [activeFilters, setActiveFilters] = useState({
     ativo: true,

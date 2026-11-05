@@ -1,12 +1,10 @@
 import React from 'react';
-import { Sidebar } from '../components/Sidebar';
 import { MapBackground } from '../components/MapBackground';
 
 export const DashboardPage: React.FC = () => {
   return (
     <div className="relative w-full h-screen overflow-hidden bg-black">
       <MapBackground />
-      <Sidebar />
       
       {/* Botão Menu Superior Direito */}
       <div className="absolute top-4 right-4 z-[1000]">
