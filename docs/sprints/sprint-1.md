@@ -1,5 +1,7 @@
 # Sprint 1 — relatório de entrega
 
+O corpo deste relatório retrata o corte de **19/10/2026**. Os estados de issues, branches e componentes descritos a seguir correspondem àquele momento. A [devolutiva do cliente](#devolutiva-do-cliente), acrescentada em 06/11, compara os pedidos recebidos com a versão preparada para a Sprint 2.
+
 ## Identificação
 
 - **Janela observável no GitHub:** 01/10/2026 a 19/10/2026.
@@ -101,12 +103,18 @@ Esta tabela organiza evidências; não substitui a avaliação do professor.
 
 
 
+## Validação técnica
+
+No corte de 19/10, o frontend iniciava em desenvolvimento. Os builds do frontend e do backend, o lint do frontend e a validação do Compose falharam. Os comandos, erros e resultados daquele dia estão no [registro histórico de validação técnica](https://github.com/404NotFound-ABP/greener/blob/79f582ec9658d13affcfde0065e854eb48abb815/docs/sprints/sprint-1.md#validação-técnica).
+
 ## Como verificar a entrega
+
+Para reproduzir o protótipo de 19/10, selecionar o commit avaliado. Para executar a versão atual, seguir o [guia do projeto](../../README.md).
 
 ```bash
 git clone https://github.com/404NotFound-ABP/greener.git
 cd greener
-git switch dev
+git switch --detach 31e7d538f359b30f10e1b6cec803f1533c782e0f
 cd frontend
 npm ci
 npm run dev
@@ -122,9 +130,15 @@ Na interface, verificar:
 
 Os dados são simulados e o mapa exige internet.
 
+## Sprint Review
 
+Em 19/10, a equipe havia registrado o incremento demonstrável e a pendência de documentar a apresentação, o feedback e as decisões. O texto recebido do cliente foi incorporado no adendo de 06/11. [Registro histórico da Sprint Review](https://github.com/404NotFound-ABP/greener/blob/79f582ec9658d13affcfde0065e854eb48abb815/docs/sprints/sprint-1.md#sprint-review) · [Devolutiva do cliente](#devolutiva-do-cliente)
 
-### Ações para a Sprint 2
+O registro histórico da retrospectiva reúne observações sobre o repositório. A comprovação da retrospectiva da equipe exige data, participantes e ações acordadas. [Retrospectiva documental de 19/10](https://github.com/404NotFound-ABP/greener/blob/79f582ec9658d13affcfde0065e854eb48abb815/docs/sprints/sprint-1.md#retrospectiva-documental)
+
+## Ações para a Sprint 2
+
+As sugestões e os responsáveis abaixo foram registrados no corte de 19/10.
 
 | Ação | Responsável sugerido | Evidência de conclusão |
 |---|---|---|
@@ -145,3 +159,17 @@ O mapeamento individual e seus limites estão em [Equipe e contribuições](../a
 - #51 possui scaffold parcial, embora esteja em Backlog;
 - os épicos aparecem em 0%, apesar dos protótipos concluídos;
 - não existem milestone, pull request, release ou tag da Sprint 1.
+
+## Devolutiva do cliente
+
+Adendo de **06/11/2026**, a partir da [devolutiva original fornecida pela PO](../evidencias/sprint-1/devolutiva-do-cliente.md). O cliente avaliou o protótipo e também examinou código incorporado após 19/10. A coluna da direita registra a verificação posterior da [`main` no commit `1e075b9`](https://github.com/404NotFound-ABP/greener/commit/1e075b9d2d0a0e2b8dbe396c6121a56057cbc4e1).
+
+| Frente | O que o cliente reconheceu e pediu | Situação verificada em 06/11 |
+|---|---|---|
+| Design | Reconheceu o escopo do Figma e os estados com texto e ícones. Pediu vincular o design ao código por meio de estilos e capturas desktop/mobile. | A documentação identifica os tokens e inclui [capturas reais em desktop e celular](../interface.md#capturas-do-dashboard). Em 360 × 800 px, a barra lateral cortou controles e o seletor de tema cobriu o rodapé. Faltam o comparativo com o frame do Figma e os resultados da avaliação com usuários. |
+| Qualidade de código | Destacou os módulos, as migrações, a coleta e a fórmula ambiental. Apontou falhas de build, lacunas de testes e Compose incompleto. | Os dois builds e o lint do frontend passaram. Os três serviços subiram pelo Compose. Em banco novo, o dashboard da API respondeu 500 até aplicar as migrações. Continuam pendentes a suíte de testes versionada, o lint do backend e a integração contínua. [Migrações e persistência](https://github.com/404NotFound-ABP/greener/issues/155) |
+| Processo | Pediu integrar a entrega em uma branch estável e usar PRs com revisão, CI e tag para identificar a versão avaliada. | O PR #58 integrou a `dev` à `main` em 05/11. O GitHub registrava zero revisões submetidas nesse PR e nenhuma tag da sprint. [PR de integração](https://github.com/404NotFound-ABP/greener/pull/58) |
+| Documentação | Valorizou o backlog, o plano e os critérios de aceite. Pediu datar o estado descrito, corrigir o link de evidências e distinguir código entregue de planejamento. | O corte de 19/10 e seu snapshot podem ser consultados pela versão histórica. A Sprint 2 possui acompanhamento próprio. [Snapshot de evidências](https://github.com/404NotFound-ABP/greener/blob/d69dcf2347bb5962b3ef662b215bdae92de94d16/docs/evidencias/sprint-1/README.md) · [Relatório da Sprint 2](sprint-2.md) |
+| Produto | Pediu rodar uma coleta real, conferir o valor no banco e mostrá-lo no dashboard. | Após a migração manual, o teste registrou 14 medições de 7 serviços e confirmou que uma leitura permaneceu no PostgreSQL após o reinício. O frontend ainda apresenta exemplos fixos. [Integração da lista](https://github.com/404NotFound-ABP/greener/issues/91) |
+
+Em 06/11, a issue da apresentação e as tarefas de registro e priorização da devolutiva estavam fechadas. O material fornecido documenta os pedidos do cliente. A data efetiva da reunião, os participantes e as decisões acordadas precisam de confirmação da equipe para compor uma ata. A tarefa de retrospectiva seguia aberta. [Apresentação](https://github.com/404NotFound-ABP/greener/issues/48) · [Feedback recebido](https://github.com/404NotFound-ABP/greener/issues/157) · [Priorização](https://github.com/404NotFound-ABP/greener/issues/158) · [Retrospectiva](https://github.com/404NotFound-ABP/greener/issues/159)

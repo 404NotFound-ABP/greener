@@ -1,47 +1,23 @@
 # Documentação do GreenER
 
-Este diretório registra o estado verificável do projeto. Documentos de planejamento não devem ser interpretados como funcionalidades implementadas.
-
-## Entrega da Sprint 1
-
-| Documento | Conteúdo |
-|---|---|
-| [Relatório da Sprint 1](sprints/sprint-1.md) | Escopo, tarefas, evidências, validações, review e retrospectiva documental |
-| [Plano de entregas](plano-de-entregas.md) | Objetivos e entregas previstas para as três sprints |
-| [Backlog](academico/backlog.md) | Épicos, histórias, DOR, DOD e critérios de aceite |
-| [Equipe](academico/equipe.md) | Participação verificável por integrante/login |
-| [Definition of Done](definition-of-done.md) | Regras para considerar uma entrega concluída |
-| [Snapshot de evidências](evidencias/sprint-1/README.md) | Estado datado do Project, issues, Figma e validações |
+Para preparar a demonstração de **10/11/2026**, comece pelo [relatório da Sprint 2](sprints/sprint-2.md). Ele registra a versão testada, os resultados no Docker e no navegador e o que falta para o aceite. Para executar a mesma versão, siga o [guia de instalação](../README.md).
 
 ## Documentação técnica
 
-| Documento | Situação descrita |
+| Documento | O que consultar |
 |---|---|
-| [Arquitetura](arquitetura.md) | Arquitetura existente e componentes ainda planejados |
-| [Interface](interface.md) | Usuários, fluxos, telas, estados e limitações do protótipo |
-| [API](api.md) | Ausência de API funcional e contratos que precisam ser definidos |
-| [Cálculos ambientais](calculos.md) | Ausência de fórmula validada e cuidados com valores simulados |
-| [Frontend](../frontend/README.md) | Execução e limites do protótipo React |
-| [Backend](../backend/README.md) | Estado do scaffold NestJS/Drizzle |
+| [Arquitetura](arquitetura.md) | Caminho dos dados da UniLaunch ao PostgreSQL, componentes e pontos de integração |
+| [API](api.md) | Contratos externos e rotas do backend para coleta e consulta |
+| [Cálculos ambientais](calculos.md) | Fórmula, unidades, intervalo da leitura, exemplo conferido e tratamento de ausências |
+| [Interface](interface.md) | Fluxos do protótipo, uso de dados simulados e resultado da verificação mobile |
+| [Frontend](../frontend/README.md) | Execução do React, build, lint e limites das telas |
+| [Backend](../backend/README.md) | Execução do NestJS, migrações e acesso ao Swagger |
 
-## Planejamento futuro
+## Produto e entregas
 
-- [Sprint 2](sprints/sprint-2.md): carryover técnico e integração mínima;
-- [Sprint 3](sprints/sprint-3.md): histórico, segurança, qualidade e validação final.
-
-## Fontes externas de evidência
-
-- [GitHub Project #5](https://github.com/users/404NotFound-ABP/projects/5)
-- [Issues do repositório](https://github.com/404NotFound-ABP/greener/issues)
-- [Protótipo no Figma](https://www.figma.com/design/zPrdeRlYtzyWwmbuTiwQqE/GeenER?node-id=0-1)
-
-## Regra de leitura
-
-Termos usados nestes documentos:
-
-- **implementado**: há código integrado e uma forma de verificação;
-- **protótipo**: demonstra a interface ou o fluxo, geralmente com dados simulados;
-- **scaffold**: estrutura ou configuração inicial, ainda sem comportamento funcional;
-- **planejado**: pertence ao backlog, mas não foi entregue.
-
-[Voltar à apresentação do projeto](../README.md)
+- [Enunciado do desafio](Desafio%203DSM%20-%202026-2.pdf) e [contexto do projeto](academico/contexto.md).
+- [Backlog e critérios de aceite](academico/backlog.md), [plano das três sprints](plano-de-entregas.md) e [Definition of Done](definition-of-done.md).
+- [Sprint 1 e devolutiva do cliente](sprints/sprint-1.md). O [snapshot histórico](https://github.com/404NotFound-ABP/greener/blob/d69dcf2347bb5962b3ef662b215bdae92de94d16/docs/evidencias/sprint-1/README.md) preserva as evidências da época.
+- [Sprint 2 em preparação](sprints/sprint-2.md) e [escopo previsto para a Sprint 3](sprints/sprint-3.md).
+- [Equipe e contribuições](academico/equipe.md), [quadro do projeto](https://github.com/users/404NotFound-ABP/projects/5/views/2) e [issues](https://github.com/404NotFound-ABP/greener/issues).
+- [Protótipo no Figma](https://www.figma.com/design/zPrdeRlYtzyWwmbuTiwQqE/GeenER?node-id=0-1). Em 06/11 o servidor respondeu 403 na primeira consulta e 200 na rechecagem da página. A equipe ainda precisa confirmar que o perfil do avaliador consegue visualizar as telas do arquivo.

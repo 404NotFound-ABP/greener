@@ -1,90 +1,59 @@
 # Interface e experiência de uso
 
+Em 06/11/2026, a `main` já reunia login, cadastro, painel administrativo e mapa. No build testado, era possível abrir essas telas e explorar os exemplos mesmo com o backend desligado. A integração do dashboard com as coletas reais continua pendente. [Versão verificada](https://github.com/404NotFound-ABP/greener/commit/1e075b9d2d0a0e2b8dbe396c6121a56057cbc4e1) · [Inventário da interface em 19/10](https://github.com/404NotFound-ABP/greener/blob/f755109253ed1fa11fd74a5a803e2c4862cd4360/docs/interface.md)
+
 ## Perfis e tarefas
 
-| Perfil | Objetivo | Tarefas prioritárias |
+| Quem usa | Tarefa | Fluxo atual |
 |---|---|---|
-| Pessoa que acompanha o ambiente | Entender disponibilidade e impacto dos serviços | Localizar serviços; distinguir ativo, indisponível e sem métricas; consultar valores e atualização |
-| Responsável pelo monitoramento | Ajustar a operação do monitoramento | Autenticar-se e configurar intervalos; fluxo apenas planejado |
+| Pessoa que acompanha o ambiente | Localizar um serviço, reconhecer o estado e consultar energia, emissão e horário da leitura | Login → mapa, filtros, cards e modal com exemplos locais |
+| Responsável pelo monitoramento | Autenticar-se e alterar os intervalos de coleta e de atualização da tela | O login administrativo abre um painel de perfis simulados. A configuração protegida dos intervalos está prevista na [Sprint 3](sprints/sprint-3.md). |
 
-O backlog usa majoritariamente “usuário” de forma genérica. Pesquisa de campo, personas e contexto detalhado ainda não foram realizados.
+O cadastro percorre três telas e termina no mapa. O teste com e-mail fictício e senha arbitrária abriu tanto o mapa pelo login comum quanto o painel pelo login administrativo. As transições são controladas pelo estado do React. O aceite de autenticação e cadastro depende de chamadas à API e de uma sessão válida. [Navegação entre telas](../frontend/src/App.tsx)
 
-## Evidência do protótipo
+## Figma e estilos implementados
 
-- [Arquivo GeenER no Figma](https://www.figma.com/design/zPrdeRlYtzyWwmbuTiwQqE/GeenER?node-id=0-1)
-- Base de código: branch `dev`, commit [`31e7d53`](https://github.com/404NotFound-ABP/greener/commit/31e7d538f359b30f10e1b6cec803f1533c782e0f)
-- Seções observadas no Figma: `Login-section`, `Mapas/menus-section`, `Configurações-section`, `Estados de exceção` e `mobile-version`.
+O cliente reconheceu as seções de login, mapas/menus, configurações, exceções e mobile. Pediu evidências que permitam comparar os componentes do Figma com o resultado em tela. Em 06/11 a página do Figma respondeu HTTP 200 na rechecagem após um 403 na primeira consulta. Ainda é preciso confirmar que o avaliador consegue ver os frames do protótipo. [Protótipo no Figma](https://www.figma.com/design/zPrdeRlYtzyWwmbuTiwQqE/GeenER?node-id=0-1)
 
-O arquivo é acessível publicamente. A apresentação interativa do Figma exige uma conta, mas as telas e seções podem ser inspecionadas no arquivo compartilhado.
+| Elemento | Referência encontrada no código |
+|---|---|
+| Tipografia | Família Roboto. A folha de estilo define títulos de 20, 24, 32 e 40 px, texto de 14, 16 e 18 px e legenda de 12 px. [Escala tipográfica](../frontend/src/index.css) |
+| Cor e identificação dos estados | O modal associa verde `#2FA862` a “✓ Ativo”, vermelho `#9C2A2A` a “✕ Indisponível” e cinza a “─ Sem métricas”. No mapa, círculos coloridos representam os serviços e o texto aparece ao abrir o marcador. [Modal](../frontend/src/components/ServiceModal.tsx) · [Mapa](../frontend/src/components/MapBackground.tsx) |
+| Espaçamento e adaptação | No login, os botões se empilham em telas estreitas e passam a uma linha a partir do breakpoint `sm`. A sidebar do mapa usa a largura fixa `w-96` e o espaçamento interno `p-5`. [Login](../frontend/src/pages/LoginPage.tsx) · [Sidebar](../frontend/src/components/Sidebar.tsx) |
 
-## Fluxo demonstrável no código
+## Capturas do dashboard
 
-```mermaid
-flowchart TD
-    A["Abrir o protótipo"] --> B["Visualizar mapa e lista"]
-    B --> C["Filtrar por estado"]
-    B --> D["Selecionar marcador"]
-    D --> E{"Estado simulado"}
-    E -->|Ativo| F["Valores e gráfico ilustrativos"]
-    E -->|Indisponível| G["Aviso e último valor conhecido"]
-    E -->|Sem métricas| H["Mensagem de ausência de dados"]
-    B --> I["Alternar mapa escuro/satélite"]
-```
+Capturas reais do build de produção de `1e075b9`, feitas em 06/11/2026 com a barra lateral aberta e os três filtros de estado selecionados. A mesma tela foi aberta no Chrome em dois tamanhos de janela, com escala de pixels 1. Os mapas de fundo carregaram nas duas capturas. Os serviços e os indicadores visíveis são dados de exemplo do frontend.
 
-Login, configuração, histórico e dashboard detalhado aparecem como intenção/protótipo, mas não formam um fluxo funcional no código.
+| [Desktop · 1440 × 900](evidencias/sprint-2/dashboard-desktop.png) | [Celular · 360 × 800](evidencias/sprint-2/dashboard-mobile.png) |
+|---|---|
+| A lista e o mapa cabem lado a lado. | A barra lateral de 384 px começa a 16 px da borda, levando o conteúdo a 400 px de largura. O botão de recolher fica cortado, e o seletor de tema cobre parte do rodapé. |
 
-## Inventário do incremento React
+![Dashboard em 1440 × 900 com a lista de serviços de exemplo à esquerda e o mapa à direita](evidencias/sprint-2/dashboard-desktop.png)
 
-| Elemento | Implementado | Fonte dos dados | Limitação |
-|---|---|---|---|
-| Mapa | Sim | Array local | Sem API; falha do tile não é tratada |
-| Marcadores | Sim | Três serviços simulados | Coordenadas fixas |
-| Lista/cards | Sim | Array local separado | Pode divergir do mapa |
-| Filtros de estado | Sim | Estado React | Sem persistência; lista não representa `sem_metricas` |
-| Modais | Sim | Props simuladas | Valores/gráfico ilustrativos |
-| Última atualização | Visual | Texto fixo | Não representa uma coleta |
-| Busca | Somente visual | Nenhuma | Não filtra |
-| Pausar/atualizar | Somente visual | Nenhuma | Sem ação |
-| Login/configuração | Não | — | Arquivo de página vazio/sem navegação |
+A comparação com o Figma depende de identificar o frame correspondente. Usar estas capturas como referência anterior aos ajustes e repetir o registro na versão corrigida.
 
 ## Indicadores
 
-| Indicador/estado | Unidade ou rótulo esperado | Estado na Sprint 1 |
+| O que conferir | Observado em 06/11 | Aceite da integração |
 |---|---|---|
-| Energia | kWh e período | Número simulado; período não consistente |
-| Emissão | gCO₂e e período | Rótulo/valor incompleto; sem cálculo |
-| Água | Não está sustentado pelo backlog atual | Elemento visual a remover ou justificar |
-| Última atualização | Data/hora da última coleta válida | Horário fixo |
-| Ativo | Texto + ícone + cor | Presente |
-| Indisponível | Texto + ícone + cor; dados antigos identificados | Presente de forma simulada |
-| Sem métricas | Texto + ícone + ausência explícita de resultado | Presente no mapa/modal |
+| Energia e emissão | Os dois cards mostram 100 kWh e a unidade gCO₂e sem número. O modal apresenta gráfico ilustrativo e variação fixa no serviço ativo. | Exibir a energia em kWh e a emissão em gCO₂e para a mesma leitura do banco, com o período. Sinalizar o resultado indisponível quando faltar uma entrada necessária. |
+| Última atualização | O rodapé mostra sempre 12:00. Os controles de pausa e atualização são visuais. | Informar o horário da última coleta válida e o intervalo de atualização. Após uma falha, identificar os dados antigos até a próxima resposta válida. |
+| Disponibilidade e localização | Há três marcadores locais e dois cards em outra lista, também local. O modal representa ativo, indisponível e sem métricas. | Usar o mesmo ID e estado na lista, no mapa e no detalhe. Manter acessíveis pela lista os serviços sem coordenadas. |
+| Água | Há um controle ilustrativo “gasto de água”. | Confirmar com a PO o destino do controle. O escopo ambiental do desafio abrange energia e emissão. |
 
-Os indicadores não devem ser interpretados como medições reais.
+As medidas coletadas pelo backend podem ser verificadas pela API. Para o aceite do dashboard, comparar no banco, na API e na tela o mesmo serviço e a mesma leitura. [Contrato da API](api.md) · [Cálculos ambientais](calculos.md)
 
-## Estados necessários
+## Teste de interface e avaliação de usabilidade
 
-| Estado | Figma/protótipo | Código Sprint 1 |
+O teste técnico de 06/11 usou o build de produção no navegador. Os resultados abaixo registram comportamentos reproduzidos e os critérios para o próximo teste.
+
+| Como reproduzir | Resultado observado | O que verificar após a correção |
 |---|---|---|
-| Carregando | Previsto nas tarefas | Não implementado |
-| Lista vazia | Previsto | Apenas vazio causado por filtro, não por API |
-| Ativo | Presente | Presente |
-| Indisponível | Presente | Presente com dados fixos |
-| Sem métricas | Presente | Presente no mapa/modal |
-| Dados desatualizados | Parcial | “Último valor conhecido”, sem regra temporal |
-| Erro de API | Previsto | Não implementado |
+| No mapa, digitar um nome de serviço inexistente. | Os dois cards continuam visíveis. | A busca deve filtrar a lista e apresentar um estado vazio quando nenhum serviço corresponder. |
+| Manter marcado somente “Sem Métricas”. | Um marcador permanece visível e a lista mostra “Nenhum serviço encontrado”. | O mesmo serviço deve aparecer no filtro da lista e do mapa. |
+| Abrir o mapa com a sidebar visível em uma janela de 360 × 800 px. | Há rolagem horizontal, controles cortados à direita e o seletor de tema se sobrepõe ao rodapé. | Buscar, filtrar, fechar a sidebar e consultar a atualização sem controles encobertos. Comparar o resultado, no celular e no desktop, com as capturas de 06/11. |
 
-## Clareza e acessibilidade
+No fluxo integrado, testar ainda carregamento, lista realmente vazia, erro da API, recuperação e ausência de métricas. Verificar texto ou ícone para cada estado, contraste, navegação por teclado e nomes acessíveis dos botões de ícone. [Lista e falhas](https://github.com/404NotFound-ABP/greener/issues/94) · [Adaptação do dashboard ao celular](https://github.com/404NotFound-ABP/greener/issues/146)
 
-Ponto positivo: os estados usam texto e símbolos além de cores. Pontos a validar:
-
-- contraste e navegação por teclado;
-- rótulos acessíveis para botões compostos apenas por ícone;
-- consistência de nomes, unidades e períodos;
-- comportamento sem tiles de mapa;
-- distinção entre zero válido e ausência de dados.
-
-## Responsividade e usabilidade
-
-O Figma contém uma seção mobile. No código, a sidebar usa largura fixa e não há breakpoints específicos nem evidência versionada de teste em dispositivos. A avaliação prevista na [#41](https://github.com/404NotFound-ABP/greener/issues/41) também não possui participantes, roteiro ou resultados registrados.
-
-Consequentemente, responsividade e usabilidade permanecem parciais e foram transferidas para a Sprint 2.
+A [tarefa de avaliação](https://github.com/404NotFound-ABP/greener/issues/41) constava como fechada em 06/11. Para comprovar o critério de usabilidade, vincular o roteiro aplicado, a data, os perfis participantes, as dificuldades observadas e os ajustes com evidências de antes/depois. A verificação técnica descrita acima cobre apenas o comportamento da interface.

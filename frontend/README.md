@@ -1,75 +1,28 @@
-# React + TypeScript + Vite
+# Frontend do GreenER
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Interface em React, TypeScript e Vite para explorar serviços monitorados em uma lista e em um mapa Leaflet. O fluxo começa pelo login e inclui cadastro em três etapas, mapa, filtros e modais. A opção de acesso administrativo leva ao protótipo de gerenciamento de usuários.
 
-Currently, two official plugins are available:
+## Como abrir
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Para demonstrar a versão containerizada, siga o [roteiro com Docker](../README.md#executar-a-aplicação-com-docker). O Nginx serve o build do frontend em `http://localhost:3000` com as portas padrão. O mapa de fundo depende de internet para carregar os mapas de terceiros.
 
-## React Compiler
+Para trabalhar somente na interface, use Node.js e npm. A verificação de 06/11/2026 utilizou Node.js 24.20.0 e npm 11.19.0. Execute os comandos abaixo a partir da raiz do repositório.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```sh
+cd frontend
+npm ci
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+Abra o endereço que o Vite imprimir no terminal. Na mesma pasta, `npm run build` verifica o TypeScript e gera os arquivos em `dist/`. `npm run lint` executa o ESLint. Os dois comandos passaram no commit `1e075b9`.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## O que demonstrar na Sprint 2
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+| Fluxo | Comportamento observado em 06/11/2026 |
+|---|---|
+| Acesso e cadastro | O login comum, o cadastro e o acesso administrativo navegam entre telas por estado local. No teste, um e-mail fictício e uma senha arbitrária abriram o mapa e o painel de perfis. A integração com o JWT e a gravação do cadastro continuam pendentes. |
+| Lista, filtros e mapa | Há três marcadores e dois cards fixos. Digitar uma busca sem correspondência manteve os cards. Selecionar apenas “Sem métricas” esvaziou a lista, mas manteve um marcador visível. |
+| Medições | Os cards apresentam 100 kWh, a unidade de CO₂e sem valor numérico e o horário fixo de 12:00. O gráfico e os indicadores do modal também são simulados. A API já disponibiliza medições para a futura integração. |
+| Tela de celular | Em 360 × 800, a barra lateral ultrapassou a largura disponível e o seletor de tema cobriu o rodapé. As [capturas de desktop e celular](../docs/interface.md#capturas-do-dashboard) mostram o problema para o reteste após a correção. |
 
-```
+O componente [MapBackground](src/components/MapBackground.tsx) define os marcadores e os filtros. A [Sidebar](src/components/Sidebar.tsx) define os cards, e o [ServiceModal](src/components/ServiceModal.tsx) apresenta o detalhe. O vínculo entre design, comportamento esperado e critérios de aceite está na [documentação da interface](../docs/interface.md).

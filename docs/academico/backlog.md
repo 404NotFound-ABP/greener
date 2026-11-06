@@ -1,8 +1,17 @@
 # Backlog — GreenER
 
-> Este é o backlog do produto, não uma lista de funcionalidades entregues. As caixas permanecem desmarcadas enquanto os critérios funcionais não forem integrados e verificados. O recorte entregue na Sprint 1 está em [`docs/sprints/sprint-1.md`](../sprints/sprint-1.md) e o acompanhamento está no [GitHub Project #5](https://github.com/users/404NotFound-ABP/projects/5).
+> As caixas abaixo representam os critérios de aceite do produto. O [relatório da Sprint 1](../sprints/sprint-1.md) registra o primeiro protótipo. O [relatório da Sprint 2](../sprints/sprint-2.md) identifica as partes verificadas em 06/11/2026 e as pendências para a entrega de 10/11. As issues são acompanhadas no [GitHub Project #5](https://github.com/users/404NotFound-ABP/projects/5).
 
+## Recorte para 10/11
 
+A prioridade proposta para a review é acompanhar um serviço desde a descoberta até a tela. A coleta, o cálculo básico e a gravação já permitem conferir um registro no banco. Falta reproduzir esse valor no dashboard e distinguir os estados de falha. [Prioridades e critérios para o aceite](../sprints/sprint-2.md#prioridades-para-o-aceite)
+
+| Ordem | Histórias relacionadas | O que falta demonstrar |
+|---|---|---|
+| 1 | US01–US06 e US11 | Ambiente preparado a partir de volume novo, leitura persistida e recuperada e tratamento distinto de ausência e zero. |
+| 2 | US07, US08, US09, US10 e US18 | Lista, indicadores, localização e horário alimentados pela mesma coleta, com atualização periódica e estados coerentes. |
+
+O mapa (US17) é condicional no enunciado. Se entrar na apresentação, a lista deve continuar acessível mesmo sem coordenadas. Histórico por período, ranking, comparação e configuração autenticada (US12–US16) compõem o [escopo previsto da Sprint 3](../sprints/sprint-3.md). Há rotas de backend que antecipam parte dessas histórias.
 
 ---
 
