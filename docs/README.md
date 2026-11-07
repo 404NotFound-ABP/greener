@@ -20,4 +20,4 @@ Para preparar a demonstração de **10/11/2026**, comece pelo [relatório da Spr
 - [Sprint 1 e devolutiva do cliente](sprints/sprint-1.md). O [snapshot histórico](https://github.com/404NotFound-ABP/greener/blob/d69dcf2347bb5962b3ef662b215bdae92de94d16/docs/evidencias/sprint-1/README.md) preserva as evidências da época.
 - [Sprint 2 em preparação](sprints/sprint-2.md) e [escopo previsto para a Sprint 3](sprints/sprint-3.md).
 - [Equipe e contribuições](academico/equipe.md), [quadro do projeto](https://github.com/users/404NotFound-ABP/projects/5/views/2) e [issues](https://github.com/404NotFound-ABP/greener/issues).
-- [Protótipo no Figma](https://www.figma.com/design/zPrdeRlYtzyWwmbuTiwQqE/GeenER?node-id=0-1). Em 06/11 o servidor respondeu 403 na primeira consulta e 200 na rechecagem da página. A equipe ainda precisa confirmar que o perfil do avaliador consegue visualizar as telas do arquivo.
+
