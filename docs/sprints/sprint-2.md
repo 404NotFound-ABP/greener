@@ -2,9 +2,6 @@
 
 **Situação : em andamento.** Na [`main` avaliada (`1e075b9`)](https://github.com/404NotFound-ABP/greener/commit/1e075b9d2d0a0e2b8dbe396c6121a56057cbc4e1), o backend já descobre serviços, coleta métricas, calcula energia e emissão e grava no PostgreSQL. O dashboard React ainda exibe dados fixos. Para o aceite, falta demonstrar a mesma coleta desde a API da UniLaunch até a tela.
 
-## Escopo e data
-
-A PO informou **10/11/2026** para a entrega. O [enunciado](../Desafio%203DSM%20-%202026-2.pdf) prevê a review nesse dia. A [issue #48](https://github.com/404NotFound-ABP/greener/issues/48) menciona 20/11 como encerramento. A equipe deve esclarecer se há dois marcos e alinhar o Project com o prazo da apresentação.
 
 O [plano original](https://github.com/404NotFound-ABP/greener/blob/1e075b9/docs/sprints/sprint-2.md) admitia um contrato real ou um substituto controlado e documentado no frontend. Hoje já existe uma API consultável pelo React. Histórico por período, ranking, comparação e configuração protegida continuam no [horizonte da Sprint 3](sprint-3.md).
 
