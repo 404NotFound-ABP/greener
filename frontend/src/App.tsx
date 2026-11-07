@@ -10,8 +10,7 @@ import { RegisterStep3 } from './pages/RegisterStep3';
 import { AdminLogin } from './pages/AdminLogin';
 import { AdminDashboard } from './pages/AdminDashboard';
 
-// Importação do mapa/dashboard público
-import { MapBackground } from './components/MapBackground';
+import { MainLayout } from './components/MainLayout';
 
 export function App() {
   // Estado que controla qual ecrã está visível no momento
@@ -82,7 +81,7 @@ export function App() {
     );
   }
 
-  return <MapBackground />;
+  return <MainLayout />;
 }
 
 export default App;
