@@ -2,7 +2,7 @@
 
 ## Controle do documento
 
-- **Corte histórico da Sprint 1:** branch `dev`, commit [`31e7d53`](https://github.com/404NotFound-ABP/greener/commit/31e7d538f359b30f10e1b6cec803f1533c782e0f).
+
 - **Consolidação da Sprint 1:** 19/10/2026.
 - **Atualização para a entrega de 10/11/2026:** verificação da `main` em 06/11, commit [`1e075b9`](https://github.com/404NotFound-ABP/greener/commit/1e075b9d2d0a0e2b8dbe396c6121a56057cbc4e1). O [relatório da Sprint 2](sprints/sprint-2.md) reúne testes, limites e prioridades.
 - **Fonte de acompanhamento:** [GitHub Project #5 — quadro](https://github.com/users/404NotFound-ABP/projects/5/views/2).
