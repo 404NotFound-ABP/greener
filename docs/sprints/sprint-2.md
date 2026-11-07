@@ -1,6 +1,6 @@
 # Sprint 2 — preparação da entrega de 10/11/2026
 
-**Situação em 06/11/2026: em andamento.** Na [`main` avaliada (`1e075b9`)](https://github.com/404NotFound-ABP/greener/commit/1e075b9d2d0a0e2b8dbe396c6121a56057cbc4e1), o backend já descobre serviços, coleta métricas, calcula energia e emissão e grava no PostgreSQL. O dashboard React ainda exibe dados fixos. Para o aceite, falta demonstrar a mesma coleta desde a API da UniLaunch até a tela.
+**Situação : em andamento.** Na [`main` avaliada (`1e075b9`)](https://github.com/404NotFound-ABP/greener/commit/1e075b9d2d0a0e2b8dbe396c6121a56057cbc4e1), o backend já descobre serviços, coleta métricas, calcula energia e emissão e grava no PostgreSQL. O dashboard React ainda exibe dados fixos. Para o aceite, falta demonstrar a mesma coleta desde a API da UniLaunch até a tela.
 
 ## Escopo e data
 
