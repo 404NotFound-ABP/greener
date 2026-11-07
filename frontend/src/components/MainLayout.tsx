@@ -7,19 +7,19 @@ export const MainLayout: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'mapa' | 'dashboards' | 'historico' | 'config'>('mapa');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  // Se estiver no mapa, o ecrã é totalmente limpo, exceto pelo botão no canto
+ 
   if (activeTab === 'mapa') {
     return (
       <div className="relative w-full h-screen overflow-hidden bg-black">
         <MapPage />
         
-        {/* Botão Menu Superior Direito (Hambúrguer) */}
+        
         <div className="absolute top-4 right-4 z-[2000]">
           <button 
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             className="w-12 h-12 bg-gray-900/80 backdrop-blur-md rounded-full border border-gray-700 flex items-center justify-center text-white hover:bg-gray-800 transition shadow-lg"
           >
-            {/* Ícone de fechar quando aberto, hambúrguer quando fechado */}
+            
             {isMenuOpen ? (
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             ) : (
@@ -27,7 +27,7 @@ export const MainLayout: React.FC = () => {
             )}
           </button>
 
-          {/* O Dropdown do Menu */}
+          
           {isMenuOpen && (
             <div className="absolute right-0 mt-2 w-48 bg-[#0C1711] border border-[#1A2E20] rounded-xl shadow-xl overflow-hidden backdrop-blur-md">
               <button 
@@ -58,20 +58,15 @@ export const MainLayout: React.FC = () => {
     );
   }
 
-  // Se NÃO estiver no mapa (ex: Dashboards ou Histórico), renderiza a Sidebar Verde Fixa
+ 
   return (
     <div className="flex h-screen w-full bg-[#060D09] overflow-hidden font-sans">
      
-    
-      {/* Menu Lateral Principal (Barra Verde Escura) */}
-      {/* Menu Lateral Principal (Barra Verde Escura) */}
-      {/* Menu Lateral Principal (Barra Verde Escura) */}
       <nav className="w-[80px] bg-[#060D09] flex flex-col items-center py-6 z-50 shrink-0 border-r border-[#1A2E20]">
         
-        {/* Cápsula flutuante */}
+       
         <div className="bg-[#091A0F] p-1.5 rounded-[32px] flex flex-col gap-1 shadow-2xl border border-[#132B1A]">
           
-          {/* Botão Mapa (Pontas de cima arredondadas, base quadrada) */}
           <button 
             onClick={() => setActiveTab('mapa')} 
             className={`flex flex-col items-center justify-center w-[52px] h-[60px] rounded-t-[26px] rounded-b-[8px] transition-colors ${activeTab === 'mapa' ? 'bg-[#22D55B]' : 'bg-[#1D6B3A] hover:bg-[#258248]'}`}
@@ -82,7 +77,7 @@ export const MainLayout: React.FC = () => {
             <span className="text-[8px] font-medium text-white tracking-tight">Mapa</span>
           </button>
 
-          {/* Botão Dashboards (Meio - Formato quadrado com cantos suaves) */}
+          
           <button 
             onClick={() => setActiveTab('dashboards')} 
             className={`flex flex-col items-center justify-center w-[52px] h-[60px] rounded-[8px] transition-colors ${activeTab === 'dashboards' ? 'bg-[#22D55B]' : 'bg-[#1D6B3A] hover:bg-[#258248]'}`}
@@ -97,7 +92,7 @@ export const MainLayout: React.FC = () => {
             <span className="text-[8px] font-medium text-white tracking-tight">Dashboards</span>
           </button>
 
-          {/* Botão Histórico (Meio - Formato quadrado com cantos suaves) */}
+         
           <button 
             onClick={() => setActiveTab('historico')} 
             className={`flex flex-col items-center justify-center w-[52px] h-[60px] rounded-[8px] transition-colors ${activeTab === 'historico' ? 'bg-[#22D55B]' : 'bg-[#1D6B3A] hover:bg-[#258248]'}`}
@@ -108,7 +103,7 @@ export const MainLayout: React.FC = () => {
             <span className="text-[8px] font-medium text-white tracking-tight">Histórico</span>
           </button>
 
-          {/* Botão Config. (Topo quadrado, pontas de baixo arredondadas) */}
+          
           <button 
             onClick={() => setActiveTab('config')} 
             className={`flex flex-col items-center justify-center w-[52px] h-[60px] rounded-t-[8px] rounded-b-[26px] transition-colors ${activeTab === 'config' ? 'bg-[#22D55B]' : 'bg-[#1D6B3A] hover:bg-[#258248]'}`}
@@ -122,7 +117,7 @@ export const MainLayout: React.FC = () => {
         </div>
       </nav>
 
-      {/* Área Principal Dinâmica (Dashboards, Histórico, etc.) */}
+      
       <main className="flex-1 relative overflow-y-auto">
         {activeTab === 'dashboards' && <DashboardPage />}
         {activeTab === 'historico' && <HistoricoPage />}

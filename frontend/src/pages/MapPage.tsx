@@ -6,7 +6,7 @@ export const MapPage: React.FC = () => {
     <div className="relative w-full h-screen overflow-hidden bg-black">
       <MapBackground />
       
-      {/* Botão Menu Superior Direito */}
+     
       <div className="absolute top-4 right-4 z-[1000]">
         <button className="w-12 h-12 bg-gray-900/80 backdrop-blur-md rounded-full border border-gray-700 flex items-center justify-center text-white hover:bg-gray-800 transition shadow-lg">
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

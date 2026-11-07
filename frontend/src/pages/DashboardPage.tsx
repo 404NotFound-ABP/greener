@@ -87,7 +87,7 @@ export const DashboardPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#060D09] text-white p-8 font-sans pb-20">
       
-      {/* Cabeçalho com Pesquisa à Direita */}
+    
       <div className="flex justify-between items-start mb-6">
         <div>
           <h1 className="text-3xl font-bold mb-1">Dashboards</h1>
@@ -118,7 +118,7 @@ export const DashboardPage: React.FC = () => {
         ))}
       </div>
 
-      {/* Barra de Filtros Logo Abaixo das Métricas (Conforme o Design) */}
+      
       <div className="flex items-end gap-3 mb-10 w-full relative z-30">
         <CustomDropdown label="País" placeholder="Todos os países" options={['Brasil', 'Estados Unidos', 'Reino Unido', 'Canadá', 'Coreia do sul']} />
         <CustomDropdown label="Região" placeholder="Todas as regiões" options={['Região Sudeste', 'Região Norte', 'Região Sul', 'Região Nordeste', 'Região Centro-oeste']} />

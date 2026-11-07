@@ -54,7 +54,7 @@ export const HistoricoPage: React.FC = () => {
           <h4 className="font-bold text-lg flex items-center gap-2">Distribuição por status <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></h4>
           <p className="text-gray-400 text-xs mb-6">Proporção dos registros no período</p>
           <div className="flex items-center justify-between">
-            {/* SVG Donut Mock */}
+            {/* Donut Mock */}
             <div className="relative w-28 h-28">
               <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
                 <circle cx="18" cy="18" r="15.915" fill="transparent" stroke="#2a2a2a" strokeWidth="4"></circle>
@@ -101,7 +101,7 @@ export const HistoricoPage: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {/* Espaçamento entre o cabeçalho e a primeira linha */}
+             
               <tr className="h-2"></tr>
 
               {[
@@ -130,7 +130,7 @@ export const HistoricoPage: React.FC = () => {
           </table>
         </div>
 
-        {/* Paginação */}
+       
         <div className="flex justify-between items-center mt-6 text-[11px] text-gray-400">
           <span>Mostrando 1–6 de 128 registros</span>
           <div className="flex gap-1.5">
@@ -148,7 +148,7 @@ export const HistoricoPage: React.FC = () => {
   );
 };
 
-// Componente auxiliar para os badges atualizado conforme o design
+
 const StatusBadge = ({ status }: { status: string }) => {
   if (status === 'Ativo') {
     return (
