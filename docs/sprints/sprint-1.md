@@ -132,13 +132,12 @@ Os dados são simulados e o mapa exige internet.
 
 ## Sprint Review
 
-Em 19/10, a equipe havia registrado o incremento demonstrável e a pendência de documentar a apresentação, o feedback e as decisões. O texto recebido do cliente foi incorporado no adendo de 06/11. [Registro histórico da Sprint Review](https://github.com/404NotFound-ABP/greener/blob/79f582ec9658d13affcfde0065e854eb48abb815/docs/sprints/sprint-1.md#sprint-review) · [Devolutiva do cliente](#devolutiva-do-cliente)
+Em 19/10, a equipe havia registrado o incremento demonstrável e a pendência de documentar a apresentação, o feedback e as decisões. [Registro histórico da Sprint Review](https://github.com/404NotFound-ABP/greener/blob/79f582ec9658d13affcfde0065e854eb48abb815/docs/sprints/sprint-1.md#sprint-review) · 
 
 O registro histórico da retrospectiva reúne observações sobre o repositório. A comprovação da retrospectiva da equipe exige data, participantes e ações acordadas. [Retrospectiva documental de 19/10](https://github.com/404NotFound-ABP/greener/blob/79f582ec9658d13affcfde0065e854eb48abb815/docs/sprints/sprint-1.md#retrospectiva-documental)
 
 ## Ações para a Sprint 2
 
-As sugestões e os responsáveis abaixo foram registrados no corte de 19/10.
 
 | Ação | Responsável sugerido | Evidência de conclusão |
 |---|---|---|
@@ -150,21 +149,13 @@ As sugestões e os responsáveis abaixo foram registrados no corte de 19/10.
 
 ## Participação
 
-O mapeamento individual e seus limites estão em [Equipe e contribuições](../academico/equipe.md). Os commits da conta do projeto `404NotFound-ABP` não foram repartidos entre pessoas sem evidência.
-
-## Inconsistências que devem permanecer visíveis
-
-- #45 está fechada como issue e In Progress no Project;
-- #49–#53 estão relacionadas a #48, mas pertencem logicamente a #46;
-- #51 possui scaffold parcial, embora esteja em Backlog;
-- os épicos aparecem em 0%, apesar dos protótipos concluídos;
-- não existem milestone, pull request, release ou tag da Sprint 1.
+O mapeamento individual e seus limites estão em [Equipe e contribuições](../academico/equipe.md).
 
 ## Devolutiva do cliente
 
 Adendo de **06/11/2026**, a partir da [devolutiva original fornecida pela PO](../evidencias/sprint-1/devolutiva-do-cliente.md). O cliente avaliou o protótipo e também examinou código incorporado após 19/10. A coluna da direita registra a verificação posterior da [`main` no commit `1e075b9`](https://github.com/404NotFound-ABP/greener/commit/1e075b9d2d0a0e2b8dbe396c6121a56057cbc4e1).
 
-| Frente | O que o cliente reconheceu e pediu | Situação verificada em 06/11 |
+| Frente | O que o cliente reconheceu e pediu | 
 |---|---|---|
 | Design | Reconheceu o escopo do Figma e os estados com texto e ícones. Pediu vincular o design ao código por meio de estilos e capturas desktop/mobile. | A documentação identifica os tokens e inclui [capturas reais em desktop e celular](../interface.md#capturas-do-dashboard). Em 360 × 800 px, a barra lateral cortou controles e o seletor de tema cobriu o rodapé. Faltam o comparativo com o frame do Figma e os resultados da avaliação com usuários. |
 | Qualidade de código | Destacou os módulos, as migrações, a coleta e a fórmula ambiental. Apontou falhas de build, lacunas de testes e Compose incompleto. | Os dois builds e o lint do frontend passaram. Os três serviços subiram pelo Compose. Em banco novo, o dashboard da API respondeu 500 até aplicar as migrações. Continuam pendentes a suíte de testes versionada, o lint do backend e a integração contínua. [Migrações e persistência](https://github.com/404NotFound-ABP/greener/issues/155) |
