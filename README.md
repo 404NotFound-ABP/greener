@@ -4,7 +4,6 @@ Plataforma web para estimar o consumo de energia e as emissões de carbono de ap
 
 ## Situação para a review de 10/11/2026
 
-Na verificação de 06/11/2026, a `main` no commit [`1e075b9`](https://github.com/404NotFound-ABP/greener/commit/1e075b9d2d0a0e2b8dbe396c6121a56057cbc4e1) continha as três camadas da aplicação.
 
 | Camada | O que é possível verificar |
 |---|---|
@@ -12,7 +11,6 @@ Na verificação de 06/11/2026, a `main` no commit [`1e075b9`](https://github.co
 | PostgreSQL 16 e Drizzle ORM | Armazena regiões, serviços, medições e usuários. Um registro de coleta foi recuperado após reiniciar o banco. A primeira execução exige a etapa de migração descrita abaixo. |
 | Frontend em React e TypeScript | As telas de acesso, cadastro, administração e mapa são demonstrativas. Lista, marcadores, horário de atualização e indicadores ambientais ainda usam exemplos locais. |
 
-Para o aceite da Sprint 2, falta exibir na tela a mesma medição consultada na API e no banco. O estado dos critérios e as pendências estão no [registro da Sprint 2](docs/sprints/sprint-2.md).
 
 ## Executar a aplicação com Docker
 
