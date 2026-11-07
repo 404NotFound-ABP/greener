@@ -1,60 +1,127 @@
-import React from 'react';
+import React, { useState } from 'react';
+import type { ServiceData } from '../types/service';
 
-interface ServiceCardProps {
-  data: {
-    id: number;
-    name: string;
-    isActive: boolean;
-    location: { country: string; region: string; city: string; };
-    metrics: { kwh: number; co2: string; };
-  };
+export interface ServiceCardProps {
+  service: ServiceData;
 }
 
-export const ServiceCard: React.FC<ServiceCardProps> = ({ data }) => {
+export const ServiceCard: React.FC<ServiceCardProps> = ({ service }) => {
+  const [isSelected, setIsSelected] = useState(false);
+
+  const statusNorm = service?.status?.toLowerCase() || '';
+  const isAtivo = statusNorm === 'ativo';
+  const isIndisponivel = statusNorm === 'indisponível' || statusNorm === 'indisponivel';
+
   return (
-    <div className="bg-[#166A3E]/20 border border-[#166A3E] rounded-2xl p-4 shadow-lg transition flex flex-col gap-4">
+    <div className="self-stretch w-full p-[10px] bg-[#166A3E]/50 overflow-hidden rounded-[14px] border border-[#2FA862] flex flex-col justify-start items-start gap-[14px] shrink-0">
       
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <input 
-            type="checkbox" defaultChecked={data.isActive}
-            className="w-4 h-4 rounded cursor-pointer accent-[#2FA862]"
-          />
-          <span className="font-semibold text-sm text-white">{data.name}</span>
-        </div>
-        
-        <span className={`px-3 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 border ${
-          data.isActive 
-            ? 'bg-[#2FA862]/20 text-[#2FA862] border-[#2FA862]' 
-            : 'bg-[#9C2A2A]/20 text-[#9C2A2A] border-[#9C2A2A]'
-        }`}>
-          {data.isActive ? '✓ Ativo' : '✕ Indisponível'}
-        </span>
-      </div>
+      {/* =========================================================
+          1. TOPO: Checkbox + Nome do Serviço + Badge de Estado
+          ========================================================= */}
+      <div className="self-stretch px-[5px] flex justify-start items-center gap-[8px]">
+        {/* Checkbox 25x25px clicável */}
+        <button
+          type="button"
+          onClick={() => setIsSelected(!isSelected)}
+          aria-label={`Selecionar ${service.nome}`}
+          className={`w-[25px] h-[25px] relative rounded-[5px] border border-[#2FA862] flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
+            isSelected ? 'bg-[#2FA862]' : 'bg-transparent hover:bg-[#2FA862]/20'
+          }`}
+        >
+          {isSelected && (
+            <svg className="w-[16px] h-[16px] text-[#F7F7F5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+            </svg>
+          )}
+        </button>
 
-      <div>
-        <span className="text-xs font-medium text-gray-300 block mb-2">Localização</span>
-        <div className="flex gap-2 text-xs">
-          <div className="bg-white/5 border border-white/10 rounded px-2.5 py-1 text-gray-200">País: {data.location.country}</div>
-          <div className="bg-white/5 border border-white/10 rounded px-2.5 py-1 text-gray-200">Região: {data.location.region}</div>
-          <div className="bg-white/5 border border-white/10 rounded px-2.5 py-1 text-gray-200">Cidade: {data.location.city}</div>
+        {/* Nome do Serviço */}
+        <div className="flex-1 text-[#F7F7F5] text-[16px] font-normal leading-[24px] break-words">
+          {service.nome}
         </div>
-      </div>
 
-      <div>
-        <span className="text-xs font-medium text-gray-300 block mb-2">Valores</span>
-        <div className="bg-black/20 border border-white/10 rounded p-3 flex flex-col gap-3">
-          <div className="flex justify-between items-center text-xs text-gray-200">
-            <span>{data.metrics.kwh} kWh</span>
-            <div className="w-32 bg-black/40 h-1.5 rounded-full overflow-hidden">
-              <div className="bg-[#FFD32C] h-full w-3/4 rounded-full"></div>
-            </div>
+        {/* Badge de Status (Ativo / Indisponível / Sem métricas) */}
+        <div
+          className={`px-[5px] py-[4px] overflow-hidden rounded-[10px] border flex justify-start items-center gap-[4px] shrink-0 ${
+            isAtivo
+              ? 'bg-[#2FA862] border-[#2FA862]'
+              : isIndisponivel
+              ? 'bg-[#9C2A2A] border-[#F34F0E]'
+              : 'bg-[#4A504D] border-[#B8B7B8]'
+          }`}
+        >
+          <div className="w-[25px] h-[25px] relative overflow-hidden flex items-center justify-center shrink-0">
+            {isAtivo ? (
+              <svg className="w-[20px] h-[20px] text-[#F7F7F5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <rect x="3" y="3" width="18" height="18" rx="4" strokeWidth="2" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M9 12l2 2 4-4" />
+              </svg>
+            ) : isIndisponivel ? (
+              <svg className="w-[20px] h-[20px] text-[#F2FAF5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <rect x="3" y="3" width="18" height="18" rx="4" strokeWidth="2" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M10 10l4 4m0-4l-4 4" />
+              </svg>
+            ) : (
+              <svg className="w-[20px] h-[20px] text-[#F2FAF5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <rect x="3" y="3" width="18" height="18" rx="4" strokeWidth="2" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M8 12h8" />
+              </svg>
+            )}
           </div>
-          <div className="flex justify-between items-center text-xs text-gray-200">
-            <span>{data.metrics.co2}</span>
-            <div className="w-32 bg-black/40 h-1.5 rounded-full overflow-hidden">
-              <div className="bg-[#2FA862] h-full w-1/2 rounded-full"></div>
-            </div>
+          <span className="text-[#F2FAF5] text-[16px] font-normal leading-[24px]">
+            {service.status}
+          </span>
+        </div>
+      </div>
+
+      {/* =========================================================
+          2. LOCALIZAÇÃO: País, Região e Cidade
+          ========================================================= */}
+      <div className="self-stretch flex flex-col justify-center items-start gap-[5px]">
+        <div className="text-[#F2FAF5] text-[16px] font-normal leading-[24px]">
+          Localização
+        </div>
+        <div className="self-stretch flex justify-start items-start gap-[10px] flex-wrap content-start">
+          <div className="p-[4px] rounded-[6px] border border-[#2FA862] flex flex-col justify-center items-center">
+            <span className="text-[#F2FAF5] text-[14px] font-normal leading-[20px]">
+              País: {service.localizacao.pais}
+            </span>
+          </div>
+          <div className="p-[4px] overflow-hidden rounded-[6px] border border-[#2FA862] flex flex-col justify-start items-start">
+            <span className="text-[#F2FAF5] text-[14px] font-normal leading-[20px]">
+              Região: {service.localizacao.regiao}
+            </span>
+          </div>
+          <div className="p-[4px] overflow-hidden rounded-[6px] border border-[#2FA862] flex flex-col justify-start items-start">
+            <span className="text-[#F2FAF5] text-[14px] font-normal leading-[20px]">
+              Cidade: {service.localizacao.cidade}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* =========================================================
+          3. VALORES: kWh e gCO₂e com barras roxas (#8A38F5)
+          ========================================================= */}
+      <div className="self-stretch flex flex-col justify-start items-start gap-[5px]">
+        <div className="text-white text-[16px] font-normal leading-[24px]">
+          Valores
+        </div>
+        <div className="self-stretch p-[5px] rounded-[10px] border border-[#2FA862] flex flex-col justify-start items-start gap-[4px]">
+          {/* Linha 1: kWh */}
+          <div className="inline-flex justify-start items-center gap-[6px]">
+            <span className="text-[#F2FAF5] text-[14px] font-normal leading-[20px]">
+              {service.valores.kwh} kWh
+            </span>
+            <div className="w-[100px] h-[4px] relative bg-[#8A38F5] rounded-[10px]" />
+          </div>
+
+          {/* Linha 2: gCO₂e */}
+          <div className="inline-flex justify-start items-center gap-[6px]">
+            <span className="text-[#F2FAF5] text-[14px] font-normal leading-[20px]">
+              gCO₂e
+            </span>
+            <div className="w-[100px] h-[4px] relative bg-[#8A38F5] rounded-[10px]" />
           </div>
         </div>
       </div>
