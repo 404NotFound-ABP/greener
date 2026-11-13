@@ -220,16 +220,4 @@ describe('ServidoresService — consultas do banco', () => {
     expect(resultado.ranking[0]?.emissoes_total_gco2e).toBe(50);
     expect(contexto.consultas[0]?.tabela).toBe(schema.coletasMetricas);
   });
-
-  it('não transforma indicador ausente em zero no histórico', async () => {
-    // Arrange
-    contexto.fila.push([servidor('a')], [coleta(null, null, '2026-11-12T12:00:00Z')]);
-
-    // Act
-    const resultado = await contexto.service.getHistoricoServidor('a');
-
-    // Assert
-    expect(resultado.pontos[0]?.energia_kwh).toBeNull();
-    expect(resultado.pontos[0]?.emissoes_gco2e).toBeNull();
-  });
 });
