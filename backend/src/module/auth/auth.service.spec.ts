@@ -30,7 +30,7 @@ function preparar() {
     { select } as unknown as DrizzleDB,
   );
 
-  return { service, respostas, assinar, where, select };
+  return { service, respostas, assinar, where, select, limit };
 }
 
 function usuario() {
@@ -117,5 +117,33 @@ describe('AuthService', () => {
 
     // Assert
     await expect(resultado).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('não emite token quando a consulta do usuário ao banco falha', async () => {
+    // Arrange
+    const erro = new Error('banco indisponível');
+    contexto.limit.mockRejectedValueOnce(erro);
+
+    // Act
+    const resultado = contexto.service.login({ email: 'ana@example.com', password: 'segredo' });
+
+    // Assert
+    await expect(resultado).rejects.toBe(erro);
+    expect(compararSenha).not.toHaveBeenCalled();
+    expect(contexto.assinar).not.toHaveBeenCalled();
+  });
+
+  it('não emite token quando a comparação da senha falha', async () => {
+    // Arrange
+    const erro = new Error('comparação indisponível');
+    contexto.respostas.push([usuario()]);
+    compararSenha.mockRejectedValueOnce(erro);
+
+    // Act
+    const resultado = contexto.service.login({ email: 'ana@example.com', password: 'segredo' });
+
+    // Assert
+    await expect(resultado).rejects.toBe(erro);
+    expect(contexto.assinar).not.toHaveBeenCalled();
   });
 });

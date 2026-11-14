@@ -59,6 +59,8 @@ function criarBancoSimulado() {
   const gravacoes: Gravacao[] = [];
   const conflitos: { tabela: unknown; alvo: unknown }[] = [];
   const atualizacoes: Atualizacao[] = [];
+  const alteracoesPorConflito: Gravacao[] = [];
+  const remover = jest.fn((_tabela: unknown) => ({ where: jest.fn(async (_: unknown) => undefined) }));
   const salvarColeta = jest.fn<(valores: Record<string, unknown>) => Promise<void>>()
     .mockImplementation(async (valores) => {
       gravacoes.push({ tabela: schema.coletasMetricas, valores });
@@ -69,8 +71,9 @@ function criarBancoSimulado() {
       if (tabela === schema.coletasMetricas) return salvarColeta(valores);
       gravacoes.push({ tabela, valores });
       return {
-        onConflictDoUpdate: async ({ target }: { target: unknown }) => {
+        onConflictDoUpdate: async ({ target, set }: { target: unknown; set: Record<string, unknown> }) => {
           conflitos.push({ tabela, alvo: target });
+          alteracoesPorConflito.push({ tabela, valores: set });
         },
       };
     },
@@ -86,7 +89,10 @@ function criarBancoSimulado() {
     },
   }));
 
-  return { db: { insert, update } as unknown as DrizzleDB, gravacoes, conflitos, atualizacoes, salvarColeta };
+  return {
+    db: { insert, update, delete: remover } as unknown as DrizzleDB,
+    gravacoes, conflitos, atualizacoes, salvarColeta, remover, alteracoesPorConflito,
+  };
 }
 
 function prepararColetor() {
@@ -169,6 +175,66 @@ describe('CollectorService', () => {
     expect(banco.conflitos.filter((item) => item.tabela === schema.servidores))
       .toEqual([{ tabela: schema.servidores, alvo: schema.servidores.id },
         { tabela: schema.servidores, alvo: schema.servidores.id }]);
+  });
+
+  it('atualiza o cadastro e insere nova coleta sem atualizar ou excluir o histórico anterior', async () => {
+    // Arrange
+    const { service, listar, calcular, banco } = prepararColetor();
+    listar.mockResolvedValueOnce([criarServidor('a')]).mockResolvedValueOnce([
+      { ...criarServidor('a'), name: 'Servidor A atualizado', metrics_path: '/metrics/novo-a' },
+    ]);
+    calcular.mockResolvedValueOnce(criarImpacto('a')).mockResolvedValueOnce({
+      ...criarImpacto('a'),
+      impacto: { potencia_watts: 50, energia_kwh: 0.0004167, emissoes_gco2e: 0.1667 },
+    });
+
+    // Act
+    await service.executarCicloColeta();
+    jest.setSystemTime(new Date('2026-11-12T12:01:00.000Z'));
+    await service.executarCicloColeta();
+
+    // Assert — comandos de persistência, sem simular um PostgreSQL em memória.
+    const medicoes = banco.gravacoes.filter((item) => item.tabela === schema.coletasMetricas);
+    expect(medicoes).toHaveLength(2);
+    expect(medicoes.map((item) => item.valores)).toEqual([
+      expect.objectContaining({
+        servidorId: 'a', energiaKwh: '0.0003508', emissoesGco2e: '0.1403',
+        coletadoEm: new Date('2026-11-12T12:00:00.000Z'),
+      }),
+      expect.objectContaining({
+        servidorId: 'a', energiaKwh: '0.0004167', emissoesGco2e: '0.1667',
+        coletadoEm: new Date('2026-11-12T12:01:00.000Z'),
+      }),
+    ]);
+    expect(banco.alteracoesPorConflito).toContainEqual({
+      tabela: schema.servidores,
+      valores: expect.objectContaining({ nome: 'Servidor A atualizado', caminhoMetricas: '/metrics/novo-a' }),
+    });
+    expect(banco.atualizacoes.some((item) => item.tabela === schema.coletasMetricas)).toBe(false);
+    expect(banco.conflitos.some((item) => item.tabela === schema.coletasMetricas)).toBe(false);
+    expect(banco.remover).not.toHaveBeenCalled();
+  });
+
+  it('preserva zeros medidos nas métricas, no fator e nos indicadores gravados', async () => {
+    // Arrange
+    const { service, listar, calcular, banco } = prepararColetor();
+    const impacto = criarImpacto('a');
+    listar.mockResolvedValue([criarServidor('a')]);
+    calcular.mockResolvedValue({
+      ...impacto,
+      regiao: { ...impacto.regiao, carbon_intensity_gco2e_kwh: 0 },
+      metricas: { intervalo_segundos: 30, cpu_percent: 0, memoria_gb: 0, disco_gb: 0, rede_gb: 0 },
+      impacto: { potencia_watts: 0, energia_kwh: 0, emissoes_gco2e: 0 },
+    });
+
+    // Act
+    await service.executarCicloColeta();
+
+    // Assert
+    expect(banco.salvarColeta).toHaveBeenCalledWith(expect.objectContaining({
+      cpuPercent: '0', memoriaGb: '0', discoGb: '0', redeGb: '0',
+      carbonIntensityFator: '0', potenciaWatts: '0', energiaKwh: '0', emissoesGco2e: '0',
+    }));
   });
 
   it('marca os serviços ausentes como removidos quando a listagem vem vazia', async () => {
@@ -278,8 +344,16 @@ describe('CollectorService', () => {
     // Assert
     const medicoes = banco.gravacoes.filter((item) => item.tabela === schema.coletasMetricas);
     expect(medicoes.map((item) => item.valores)).toEqual([
-      expect.objectContaining({ servidorId: 'a', status: 'indisponivel', cpuPercent: null }),
-      expect.objectContaining({ servidorId: 'b', status: 'sem_metricas', cpuPercent: null }),
+      expect.objectContaining({
+        servidorId: 'a', status: 'indisponivel', intervaloSegundos: null,
+        cpuPercent: null, memoriaGb: null, discoGb: null, redeGb: null,
+        potenciaWatts: null, energiaKwh: null, emissoesGco2e: null,
+      }),
+      expect.objectContaining({
+        servidorId: 'b', status: 'sem_metricas', intervaloSegundos: null,
+        cpuPercent: null, memoriaGb: null, discoGb: null, redeGb: null,
+        potenciaWatts: null, energiaKwh: null, emissoesGco2e: null,
+      }),
     ]);
     expect(banco.atualizacoes.slice(-2).map((item) => item.valores.statusAtual))
       .toEqual(['indisponivel', 'sem_metricas']);

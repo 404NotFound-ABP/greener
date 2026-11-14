@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import type { DrizzleDB } from '@/database';
 import * as schema from '@/database/schema';
 
@@ -20,27 +20,32 @@ const { UsersService } = await import('./users.service');
 type Linha = Record<string, unknown>;
 
 function preparar() {
-  const fila: Linha[][] = [];
+  const fila: (Linha[] | Error)[] = [];
+  const responder = async () => {
+    const resposta = fila.shift() ?? [];
+    if (resposta instanceof Error) throw resposta;
+    return resposta;
+  };
   const gravacoes: Linha[] = [];
   const alteracoes: Linha[] = [];
   const remover = jest.fn(async (_: unknown) => undefined);
   const select = jest.fn((_campos?: unknown) => ({
     from: (_: unknown) => ({
-      orderBy: async (_ordem: unknown) => fila.shift() ?? [],
-      where: (_condicao: unknown) => ({ limit: async (_limite: number) => fila.shift() ?? [] }),
+      orderBy: async (_ordem: unknown) => responder(),
+      where: (_condicao: unknown) => ({ limit: async (_limite: number) => responder() }),
     }),
   }));
   const insert = jest.fn((_tabela: unknown) => ({
     values: (dados: Linha) => {
       gravacoes.push(dados);
-      return { returning: async (_campos: unknown) => fila.shift() ?? [] };
+      return { returning: async (_campos: unknown) => responder() };
     },
   }));
   const update = jest.fn((_tabela: unknown) => ({
     set: (dados: Linha) => {
       alteracoes.push(dados);
       return { where: (_condicao: unknown) => ({
-        returning: async (_campos: unknown) => fila.shift() ?? [],
+        returning: async (_campos: unknown) => responder(),
       }) };
     },
   }));
@@ -51,7 +56,7 @@ function preparar() {
   } as unknown as DrizzleDB;
   const service = new UsersService(db);
 
-  return { service, fila, gravacoes, alteracoes, update, excluir, remover };
+  return { service, fila, gravacoes, alteracoes, insert, update, excluir, remover };
 }
 
 function usuario() {
@@ -239,5 +244,74 @@ describe('UsersService', () => {
     await expect(resultado).rejects.toBeInstanceOf(NotFoundException);
     expect(contexto.excluir).not.toHaveBeenCalled();
     expect(contexto.remover).not.toHaveBeenCalled();
+  });
+
+  it('informa falha quando o banco não retorna o usuário cadastrado', async () => {
+    // Arrange
+    contexto.fila.push([], []);
+
+    // Act
+    const resultado = contexto.service.create({
+      name: 'Ana', email: 'ana@example.com', password: 'segredo123',
+    });
+
+    // Assert
+    await expect(resultado).rejects.toBeInstanceOf(InternalServerErrorException);
+    expect(contexto.insert).toHaveBeenCalledTimes(1);
+  });
+
+  it('informa falha quando o banco não retorna o usuário atualizado', async () => {
+    // Arrange
+    contexto.fila.push([usuario()], []);
+
+    // Act
+    const resultado = contexto.service.update(7, { name: 'Ana Nova' });
+
+    // Assert
+    await expect(resultado).rejects.toBeInstanceOf(InternalServerErrorException);
+    expect(contexto.update).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['cadastro', 'atualização', 'exclusão'] as const)(
+    'não informa sucesso quando o banco falha na operação de %s', async (operacao) => {
+      // Arrange
+      const erro = new Error('falha simulada no banco');
+      if (operacao === 'cadastro') contexto.fila.push([], erro);
+      if (operacao === 'atualização') contexto.fila.push([usuario()], erro);
+      if (operacao === 'exclusão') {
+        contexto.fila.push([usuario()]);
+        contexto.remover.mockRejectedValueOnce(erro);
+      }
+      const executar = {
+        cadastro: () => contexto.service.create({
+          name: 'Ana', email: 'ana@example.com', password: 'segredo123',
+        }),
+        atualização: () => contexto.service.update(7, { name: 'Ana Nova' }),
+        exclusão: () => contexto.service.delete(7),
+      };
+
+      // Act
+      const resultado = executar[operacao]();
+
+      // Assert
+      await expect(resultado).rejects.toBe(erro);
+    },
+  );
+
+  it('não grava usuário quando a geração do hash falha', async () => {
+    // Arrange
+    const erro = new Error('falha simulada no hash');
+    contexto.fila.push([]);
+    gerarHash.mockRejectedValueOnce(erro);
+
+    // Act
+    const resultado = contexto.service.create({
+      name: 'Ana', email: 'ana@example.com', password: 'segredo123',
+    });
+
+    // Assert
+    await expect(resultado).rejects.toBe(erro);
+    expect(contexto.insert).not.toHaveBeenCalled();
+    expect(contexto.gravacoes).toHaveLength(0);
   });
 });
