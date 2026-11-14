@@ -44,13 +44,14 @@ function preparar() {
       }) };
     },
   }));
+  const excluir = jest.fn((_tabela: unknown) => ({ where: remover }));
   const db = {
     select, insert, update,
-    delete: jest.fn((_tabela: unknown) => ({ where: remover })),
+    delete: excluir,
   } as unknown as DrizzleDB;
   const service = new UsersService(db);
 
-  return { service, fila, gravacoes, alteracoes, remover };
+  return { service, fila, gravacoes, alteracoes, update, excluir, remover };
 }
 
 function usuario() {
@@ -154,6 +155,55 @@ describe('UsersService', () => {
     expect(resultado.role).toBe('admin');
   });
 
+  it('recusa atualização de usuário inexistente sem gerar hash nem alterar o banco', async () => {
+    // Arrange
+    contexto.fila.push([]);
+
+    // Act
+    const resultado = contexto.service.update(999, { name: 'Ana Nova', password: 'novaSenha123' });
+
+    // Assert
+    await expect(resultado).rejects.toBeInstanceOf(NotFoundException);
+    expect(gerarHash).not.toHaveBeenCalled();
+    expect(contexto.update).not.toHaveBeenCalled();
+    expect(contexto.alteracoes).toHaveLength(0);
+  });
+
+  it('atualiza somente nome e perfil sem substituir a senha nem o e-mail', async () => {
+    // Arrange
+    const atualizado = { ...usuario(), name: 'Ana Nova', role: 'admin' as const };
+    contexto.fila.push([usuario()], [atualizado]);
+
+    // Act
+    const resultado = await contexto.service.update(7, { name: ' Ana Nova ', role: 'admin' });
+
+    // Assert
+    expect(resultado).toEqual(atualizado);
+    expect(contexto.alteracoes).toHaveLength(1);
+    expect(contexto.alteracoes[0]).toMatchObject({ name: 'Ana Nova', role: 'admin' });
+    expect(contexto.alteracoes[0]).not.toHaveProperty('password');
+    expect(contexto.alteracoes[0]).not.toHaveProperty('email');
+    expect(gerarHash).not.toHaveBeenCalled();
+    expect(resultado).not.toHaveProperty('password');
+  });
+
+  it('permite manter o próprio e-mail normalizado sem acusar duplicidade', async () => {
+    // Arrange
+    contexto.fila.push([usuario()], [{ id: 7 }], [usuario()]);
+
+    // Act
+    const resultado = await contexto.service.update(7, { email: ' ANA@EXAMPLE.COM ' });
+
+    // Assert
+    expect(resultado).toEqual(usuario());
+    expect(contexto.alteracoes).toHaveLength(1);
+    expect(contexto.alteracoes[0]).toMatchObject({ email: 'ana@example.com' });
+    expect(contexto.alteracoes[0]).not.toHaveProperty('password');
+    expect(contexto.alteracoes[0]).not.toHaveProperty('name');
+    expect(contexto.alteracoes[0]).not.toHaveProperty('role');
+    expect(gerarHash).not.toHaveBeenCalled();
+  });
+
   it('recusa atualização com e-mail de outro usuário', async () => {
     // Arrange
     contexto.fila.push([usuario()], [{ id: 8 }]);
@@ -176,5 +226,18 @@ describe('UsersService', () => {
     // Assert
     expect(resultado.message).toContain('7');
     expect(contexto.remover).toHaveBeenCalledTimes(1);
+  });
+
+  it('recusa exclusão de usuário inexistente sem enviar comando de remoção ao banco', async () => {
+    // Arrange
+    contexto.fila.push([]);
+
+    // Act
+    const resultado = contexto.service.delete(999);
+
+    // Assert
+    await expect(resultado).rejects.toBeInstanceOf(NotFoundException);
+    expect(contexto.excluir).not.toHaveBeenCalled();
+    expect(contexto.remover).not.toHaveBeenCalled();
   });
 });

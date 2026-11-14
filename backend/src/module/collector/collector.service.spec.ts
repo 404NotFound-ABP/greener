@@ -59,9 +59,14 @@ function criarBancoSimulado() {
   const gravacoes: Gravacao[] = [];
   const conflitos: { tabela: unknown; alvo: unknown }[] = [];
   const atualizacoes: Atualizacao[] = [];
+  const salvarColeta = jest.fn<(valores: Record<string, unknown>) => Promise<void>>()
+    .mockImplementation(async (valores) => {
+      gravacoes.push({ tabela: schema.coletasMetricas, valores });
+    });
 
   const insert = jest.fn((tabela: unknown) => ({
     values: (valores: Record<string, unknown>) => {
+      if (tabela === schema.coletasMetricas) return salvarColeta(valores);
       gravacoes.push({ tabela, valores });
       return {
         onConflictDoUpdate: async ({ target }: { target: unknown }) => {
@@ -81,7 +86,7 @@ function criarBancoSimulado() {
     },
   }));
 
-  return { db: { insert, update } as unknown as DrizzleDB, gravacoes, conflitos, atualizacoes };
+  return { db: { insert, update } as unknown as DrizzleDB, gravacoes, conflitos, atualizacoes, salvarColeta };
 }
 
 function prepararColetor() {
@@ -139,7 +144,12 @@ describe('CollectorService', () => {
     expect(banco.gravacoes.filter((item) => item.tabela === schema.servidores)).toHaveLength(2);
     expect(banco.gravacoes.filter((item) => item.tabela === schema.coletasMetricas)).toHaveLength(2);
     expect(banco.gravacoes.find((item) => item.tabela === schema.coletasMetricas)?.valores)
-      .toMatchObject({ servidorId: 'a', intervaloSegundos: 30, cpuPercent: '40' });
+      .toEqual({
+        servidorId: 'a', codigoRegiao: 'br-sudeste', status: 'disponivel',
+        intervaloSegundos: 30, cpuPercent: '40', memoriaGb: '4', discoGb: '20', redeGb: '1',
+        potenciaWatts: '42.1', energiaKwh: '0.0003508', carbonIntensityFator: '400',
+        emissoesGco2e: '0.1403', coletadoEm: new Date('2026-11-12T12:00:00.000Z'),
+      });
     expect(banco.atualizacoes.filter((item) => item.tabela === schema.servidores)).toHaveLength(3);
   });
 
@@ -210,6 +220,35 @@ describe('CollectorService', () => {
     expect(calcular).toHaveBeenCalledTimes(2);
     expect(banco.gravacoes.filter((item) => item.tabela === schema.coletasMetricas))
       .toEqual([expect.objectContaining({ valores: expect.objectContaining({ servidorId: 'b' }) })]);
+  });
+
+  it('continua após falha de gravação de uma coleta e permite novo ciclo', async () => {
+    // Arrange
+    const { service, listar, calcular, banco } = prepararColetor();
+    listar.mockResolvedValue([criarServidor('a'), criarServidor('b')]);
+    banco.salvarColeta.mockRejectedValueOnce(new Error('gravação da coleta indisponível'));
+
+    // Act
+    const resultado = await service.executarCicloColeta();
+
+    // Assert
+    expect(resultado).toEqual({ servidoresProcessados: 1, duracaoSegundos: 0 });
+    expect(calcular).toHaveBeenCalledTimes(2);
+    expect(banco.salvarColeta).toHaveBeenCalledTimes(2);
+    expect(banco.salvarColeta).toHaveBeenNthCalledWith(1, expect.objectContaining({ servidorId: 'a' }));
+    expect(banco.salvarColeta).toHaveBeenNthCalledWith(2, expect.objectContaining({ servidorId: 'b' }));
+    expect(Logger.prototype.error)
+      .toHaveBeenCalledWith('Falha ao processar servidor a: gravação da coleta indisponível');
+    expect(banco.gravacoes.filter((item) => item.tabela === schema.coletasMetricas))
+      .toEqual([expect.objectContaining({ valores: expect.objectContaining({ servidorId: 'b' }) })]);
+
+    // Act — a falha anterior não deve bloquear o ciclo seguinte.
+    const recuperacao = await service.executarCicloColeta();
+
+    // Assert
+    expect(recuperacao).toEqual({ servidoresProcessados: 2, duracaoSegundos: 0 });
+    expect(banco.gravacoes.filter((item) => item.tabela === schema.coletasMetricas)
+      .map((item) => item.valores.servidorId)).toEqual(['b', 'a', 'b']);
   });
 
   it('continua a coleta quando a API de regiões falha', async () => {
