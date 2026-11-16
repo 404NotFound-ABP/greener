@@ -88,6 +88,14 @@ export class CalculadoraImpacto {
   }
 }
 
+function parseNumeroValido(valor: unknown): number | null {
+  if (valor === null || valor === undefined || valor === '') {
+    return null;
+  }
+  const n = Number(valor);
+  return Number.isFinite(n) ? n : null;
+}
+
 @Injectable()
 export class ImpactService {
   constructor(
@@ -189,12 +197,29 @@ export class ImpactService {
       };
     }
 
-    // 4. Se o serviço responder, mas não contiver as métricas esperadas: "indisponivel"
+    // 4. Se o serviço responder, mas não contiver as métricas necessárias: "sem_metricas"
     if (!metricasData || !metricasData.metrics) {
       return {
         servidor_id: servidor.id,
         nome: servidor.name,
-        status: 'indisponivel',
+        status: 'sem_metricas',
+        regiao: regiaoInfo,
+        metricas: null,
+        impacto: null,
+      };
+    }
+
+    const interval = parseNumeroValido(metricasData.collection_interval_seconds);
+    const cpu = parseNumeroValido(metricasData.metrics.cpu_percent);
+    const ram = parseNumeroValido(metricasData.metrics.memory_gb);
+    const disk = parseNumeroValido(metricasData.metrics.disk_gb);
+    const net = parseNumeroValido(metricasData.metrics.network_gb);
+
+    if (interval === null || cpu === null || ram === null || disk === null || net === null) {
+      return {
+        servidor_id: servidor.id,
+        nome: servidor.name,
+        status: 'sem_metricas',
         regiao: regiaoInfo,
         metricas: null,
         impacto: null,
@@ -202,14 +227,13 @@ export class ImpactService {
     }
 
     // 5. Servidor disponível e com métricas: executa o cálculo oficial
-    const { collection_interval_seconds, metrics } = metricasData;
     const resultado = CalculadoraImpacto.calcular(
-      collection_interval_seconds,
-      metrics.cpu_percent,
-      metrics.memory_gb,
-      metrics.disk_gb,
-      metrics.network_gb,
-      carbono ? carbono.carbon_intensity_gco2e_per_kwh : null,
+      interval,
+      cpu,
+      ram,
+      disk,
+      net,
+      carbono ? parseNumeroValido(carbono.carbon_intensity_gco2e_per_kwh) : null,
     );
 
     return {
@@ -218,11 +242,11 @@ export class ImpactService {
       status: 'disponivel',
       regiao: regiaoInfo,
       metricas: {
-        intervalo_segundos: collection_interval_seconds,
-        cpu_percent: metrics.cpu_percent,
-        memoria_gb: metrics.memory_gb,
-        disco_gb: metrics.disk_gb,
-        rede_gb: metrics.network_gb,
+        intervalo_segundos: interval,
+        cpu_percent: cpu,
+        memoria_gb: ram,
+        disco_gb: disk,
+        rede_gb: net,
       },
       impacto: {
         potencia_watts: resultado.potenciaWatts,
@@ -305,11 +329,15 @@ export class ImpactService {
       }
     }
 
+    const carbonIntensityRegional =
+      parseNumeroValido(carbono?.carbon_intensity_gco2e_per_kwh) ??
+      parseNumeroValido(regiaoDb?.carbonIntensityGco2eKwh);
+
     const regiaoInfo = {
       codigo: regionCode,
       pais: servidor?.location?.country ?? regiaoDb?.pais ?? '',
       cidade: servidor?.location?.city ?? regiaoDb?.cidade ?? null,
-      carbon_intensity_gco2e_kwh: carbono?.carbon_intensity_gco2e_per_kwh ?? Number(regiaoDb?.carbonIntensityGco2eKwh ?? 0),
+      carbon_intensity_gco2e_kwh: carbonIntensityRegional ?? 0,
       renewable_share_percent: carbono?.renewable_share_percent ?? Number(regiaoDb?.renewableSharePercent ?? 0),
     };
 
@@ -350,13 +378,22 @@ export class ImpactService {
         let somaDiskGb = 0;
         let somaRedeGb = 0;
 
+        let coletasValidas = 0;
+        let possuiEmissaoValida = false;
+
         for (const c of coletas) {
-          const cpu = Number(c.cpuPercent ?? 0);
-          const ram = Number(c.memoriaGb ?? 0);
-          const disk = Number(c.discoGb ?? 0);
-          const rede = Number(c.redeGb ?? 0);
-          const dtHoras = Number(c.intervaloSegundos ?? 30) / 3600;
-          const ci = Number(c.carbonIntensityFator ?? regiaoInfo.carbon_intensity_gco2e_kwh);
+          const cpu = parseNumeroValido(c.cpuPercent);
+          const ram = parseNumeroValido(c.memoriaGb);
+          const disk = parseNumeroValido(c.discoGb);
+          const rede = parseNumeroValido(c.redeGb);
+
+          if (cpu === null || ram === null || disk === null || rede === null) {
+            continue;
+          }
+
+          coletasValidas++;
+          const dtHoras = (parseNumeroValido(c.intervaloSegundos) ?? 30) / 3600;
+          const ci = parseNumeroValido(c.carbonIntensityFator) ?? carbonIntensityRegional;
 
           const pCpu = (cpu / 100) * CalculadoraImpacto.CPU_MAX_WATTS;
           const pRam = ram * CalculadoraImpacto.RAM_WATTS_PER_GB;
@@ -373,10 +410,13 @@ export class ImpactService {
           totalEnergiaDisco += eDisk;
           totalEnergiaRede += eRede;
 
-          totalEmissoesCpu += eCpu * ci;
-          totalEmissoesRam += eRam * ci;
-          totalEmissoesDisco += eDisk * ci;
-          totalEmissoesRede += eRede * ci;
+          if (ci !== null) {
+            possuiEmissaoValida = true;
+            totalEmissoesCpu += eCpu * ci;
+            totalEmissoesRam += eRam * ci;
+            totalEmissoesDisco += eDisk * ci;
+            totalEmissoesRede += eRede * ci;
+          }
 
           somaPotenciaCpu += pCpu;
           somaPotenciaRam += pRam;
@@ -389,9 +429,26 @@ export class ImpactService {
           somaRedeGb += rede;
         }
 
-        const n = coletas.length;
+        if (coletasValidas === 0) {
+          return {
+            servidor_id: idServidor,
+            nome,
+            status: statusAtual,
+            criterio: 'acumulado',
+            origem: 'banco_historico',
+            total_coletas: 0,
+            regiao: regiaoInfo,
+            intervalo_segundos: 0,
+            totais: null,
+            discriminacao: null,
+          };
+        }
+
+        const n = coletasValidas;
         const totalEnergiaKwh = totalEnergiaCpu + totalEnergiaRam + totalEnergiaDisco + totalEnergiaRede;
-        const totalEmissoesGco2e = totalEmissoesCpu + totalEmissoesRam + totalEmissoesDisco + totalEmissoesRede;
+        const totalEmissoesGco2e = possuiEmissaoValida
+          ? Number((totalEmissoesCpu + totalEmissoesRam + totalEmissoesDisco + totalEmissoesRede).toFixed(4))
+          : null;
         const potenciaMediaWatts = (somaPotenciaCpu + somaPotenciaRam + somaPotenciaDisco + somaPotenciaRede) / n;
 
         const calcItemAcumulado = (
@@ -407,7 +464,7 @@ export class ImpactService {
             unidade,
             potencia_watts: Number((somaPotencia / n).toFixed(2)),
             energia_kwh: Number(pTotalEnergia.toFixed(7)),
-            emissoes_gco2e: Number(pTotalEmissoes.toFixed(4)),
+            emissoes_gco2e: possuiEmissaoValida ? Number(pTotalEmissoes.toFixed(4)) : null,
             percentual_impacto: pct,
           };
         };
@@ -424,7 +481,7 @@ export class ImpactService {
           totais: {
             potencia_watts: Number(potenciaMediaWatts.toFixed(2)),
             energia_kwh: Number(totalEnergiaKwh.toFixed(7)),
-            emissoes_gco2e: Number(totalEmissoesGco2e.toFixed(4)),
+            emissoes_gco2e: totalEmissoesGco2e,
           },
           discriminacao: {
             cpu: calcItemAcumulado(totalEnergiaCpu, totalEmissoesCpu, somaPotenciaCpu, somaCpuPercent, '%'),
@@ -455,7 +512,7 @@ export class ImpactService {
         metrics.memory_gb,
         metrics.disk_gb,
         metrics.network_gb,
-        regiaoInfo.carbon_intensity_gco2e_kwh,
+        carbonIntensityRegional,
       );
 
       return {
@@ -480,13 +537,15 @@ export class ImpactService {
       .limit(1);
 
     if (ultimaColeta) {
+      const intervaloColeta = parseNumeroValido(ultimaColeta.intervaloSegundos) ?? 30;
+      const ciUltimaColeta = parseNumeroValido(ultimaColeta.carbonIntensityFator) ?? carbonIntensityRegional;
       const calc = CalculadoraImpacto.calcularDiscriminado(
-        30,
+        intervaloColeta,
         Number(ultimaColeta.cpuPercent ?? 0),
         Number(ultimaColeta.memoriaGb ?? 0),
         Number(ultimaColeta.discoGb ?? 0),
         Number(ultimaColeta.redeGb ?? 0),
-        Number(ultimaColeta.carbonIntensityFator ?? regiaoInfo.carbon_intensity_gco2e_kwh),
+        ciUltimaColeta,
       );
 
       return {
@@ -496,7 +555,7 @@ export class ImpactService {
         criterio: 'instantaneo',
         origem: 'banco_historico',
         regiao: regiaoInfo,
-        intervalo_segundos: 30,
+        intervalo_segundos: intervaloColeta,
         totais: calc.totais,
         discriminacao: calc.discriminacao,
       };
