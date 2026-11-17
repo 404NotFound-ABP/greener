@@ -227,11 +227,50 @@ export class ComparativoItemDto {
 
   @ApiProperty({ example: 4.31, nullable: true })
   memoria_gb!: number | null;
+
+  @ApiProperty({ example: 27.0, nullable: true })
+  disco_gb!: number | null;
+
+  @ApiProperty({ example: 1.22, nullable: true })
+  rede_gb!: number | null;
 }
 
 export class ComparativoResponseDto {
   @ApiProperty({ example: 300, description: 'Janela de amostragem aplicada em segundos' })
   janela_amostragem_segundos!: number;
+
+  @ApiProperty({
+    example: { inicio: '2026-11-16T23:55:00.000Z', fim: '2026-11-17T00:00:00.000Z' },
+    description: 'Período comum utilizado na comparação dos serviços',
+  })
+  periodo!: {
+    inicio: Date;
+    fim: Date;
+  };
+
+  @ApiProperty({
+    example: {
+      cpu_percent: '%',
+      memoria_gb: 'GB',
+      disco_gb: 'GB',
+      rede_gb: 'GB',
+      potencia_watts: 'W',
+      energia_kwh: 'kWh',
+      emissoes_gco2e: 'gCO2e',
+      intensidade_carbono_regional: 'gCO2e/kWh',
+    },
+    description: 'Unidades de cada métrica e indicador ambiental retornado',
+  })
+  unidades!: {
+    cpu_percent: string;
+    memoria_gb: string;
+    disco_gb: string;
+    rede_gb: string;
+    potencia_watts: string;
+    energia_kwh: string;
+    emissoes_gco2e: string;
+    intensidade_carbono_regional: string;
+  };
 
   @ApiProperty({ example: 2 })
   total_comparados!: number;

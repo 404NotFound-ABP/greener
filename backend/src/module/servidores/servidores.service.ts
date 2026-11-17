@@ -314,6 +314,8 @@ export class ServidoresService {
     // Comparativo entre serviços selecionados (ou todos ativos)
     async getComparativo(ids?: string[], janelaSegundos?: number) {
         const janela = this.resolverJanelaSegundos(janelaSegundos);
+        const fim = new Date();
+        const inicio = new Date(fim.getTime() - janela * 1000);
         let servidores = await this.listServidoresDoBanco(janela);
 
         if (ids && ids.length > 0) {
@@ -331,6 +333,8 @@ export class ServidoresService {
             emissoes_gco2e: s.ultima_coleta?.emissoes_gco2e ?? null,
             cpu_percent: s.ultima_coleta?.cpu_percent ?? null,
             memoria_gb: s.ultima_coleta?.memoria_gb ?? null,
+            disco_gb: s.ultima_coleta?.disco_gb ?? null,
+            rede_gb: s.ultima_coleta?.rede_gb ?? null,
         }));
 
         // Ordena por maior emissão de carbono, mantendo nulos ao final
@@ -338,6 +342,17 @@ export class ServidoresService {
 
         return {
             janela_amostragem_segundos: janela,
+            periodo: { inicio, fim },
+            unidades: {
+                cpu_percent: '%',
+                memoria_gb: 'GB',
+                disco_gb: 'GB',
+                rede_gb: 'GB',
+                potencia_watts: 'W',
+                energia_kwh: 'kWh',
+                emissoes_gco2e: 'gCO2e',
+                intensidade_carbono_regional: 'gCO2e/kWh',
+            },
             total_comparados: comparativo.length,
             servidores: comparativo,
         };

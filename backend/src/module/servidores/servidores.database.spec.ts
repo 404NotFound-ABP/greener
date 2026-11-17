@@ -557,5 +557,40 @@ describe('ServidoresService — consultas do banco', () => {
         ),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
+
+    it('RF15: inclui disco_gb, rede_gb, periodo e unidades no comparativo preservando nulos', async () => {
+      // Arrange
+      const itens = [
+        {
+          id: 'a', nome: 'A', status: 'disponivel',
+          regiao: { pais: 'Brasil', carbon_intensity_gco2e_kwh: 400 },
+          ultima_coleta: {
+            potencia_watts: 40, energia_kwh: 1, emissoes_gco2e: 5,
+            cpu_percent: 50, memoria_gb: 4, disco_gb: 20, rede_gb: 1.5,
+          },
+        },
+        { id: 'sem-dados', nome: 'Sem Dados', status: 'sem_metricas', regiao: null, ultima_coleta: null },
+      ] as Awaited<ReturnType<typeof contexto.service.listServidoresDoBanco>>;
+      jest.spyOn(contexto.service, 'listServidoresDoBanco').mockResolvedValue(itens);
+
+      // Act
+      const resultado = await contexto.service.getComparativo();
+
+      // Assert
+      expect(resultado.periodo.inicio).toBeInstanceOf(Date);
+      expect(resultado.periodo.fim).toBeInstanceOf(Date);
+      expect(resultado.unidades).toMatchObject({
+        cpu_percent: '%',
+        memoria_gb: 'GB',
+        disco_gb: 'GB',
+        rede_gb: 'GB',
+        potencia_watts: 'W',
+        energia_kwh: 'kWh',
+        emissoes_gco2e: 'gCO2e',
+        intensidade_carbono_regional: 'gCO2e/kWh',
+      });
+      expect(resultado.servidores[0]).toMatchObject({ disco_gb: 20, rede_gb: 1.5 });
+      expect(resultado.servidores[1]).toMatchObject({ disco_gb: null, rede_gb: null, emissoes_gco2e: null });
+    });
   });
 });
