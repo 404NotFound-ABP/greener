@@ -314,4 +314,59 @@ describe('UsersService', () => {
     expect(contexto.insert).not.toHaveBeenCalled();
     expect(contexto.gravacoes).toHaveLength(0);
   });
+
+  describe('seedInitialAdmin (S01 e S02)', () => {
+    const envOriginal = {
+      ADMIN_EMAIL: process.env.ADMIN_EMAIL,
+      ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
+      ADMIN_NAME: process.env.ADMIN_NAME,
+    };
+
+    afterEach(() => {
+      process.env.ADMIN_EMAIL = envOriginal.ADMIN_EMAIL;
+      process.env.ADMIN_PASSWORD = envOriginal.ADMIN_PASSWORD;
+      process.env.ADMIN_NAME = envOriginal.ADMIN_NAME;
+    });
+
+    it('S01: ignora criação do admin inicial quando ADMIN_EMAIL ou ADMIN_PASSWORD não estão definidos', async () => {
+      // Arrange
+      delete process.env.ADMIN_EMAIL;
+      delete process.env.ADMIN_PASSWORD;
+      contexto.fila.push([]);
+
+      // Act
+      await contexto.service.onApplicationBootstrap();
+
+      // Assert
+      expect(gerarHash).not.toHaveBeenCalled();
+      expect(contexto.insert).not.toHaveBeenCalled();
+      expect(contexto.gravacoes).toHaveLength(0);
+    });
+
+    it('S01 e S02: cria admin inicial pelas variáveis de ambiente sem expor a senha no log', async () => {
+      // Arrange
+      process.env.ADMIN_NAME = 'Admin Greener';
+      process.env.ADMIN_EMAIL = 'admin@greener.org';
+      process.env.ADMIN_PASSWORD = 'SenhaSuperSecreta!123';
+      contexto.fila.push([], []);
+      const logSpy = jest.spyOn(
+        (contexto.service as unknown as { logger: { log: (msg: string) => void } }).logger,
+        'log',
+      ).mockImplementation(() => undefined);
+
+      // Act
+      await contexto.service.onApplicationBootstrap();
+
+      // Assert
+      expect(gerarHash).toHaveBeenCalledWith('SenhaSuperSecreta!123', 10);
+      expect(contexto.gravacoes).toHaveLength(1);
+      expect(contexto.gravacoes[0]).toMatchObject({
+        name: 'Admin Greener',
+        email: 'admin@greener.org',
+        role: 'admin',
+      });
+      expect(logSpy).toHaveBeenCalledTimes(1);
+      expect(logSpy.mock.calls[0]?.[0]).not.toContain('SenhaSuperSecreta!123');
+    });
+  });
 });

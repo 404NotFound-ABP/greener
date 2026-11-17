@@ -24,16 +24,29 @@ export class UsersService implements OnApplicationBootstrap {
         .where(eq(schema.users.role, 'admin'))
         .limit(1);
 
-      if (!adminExists) {
-        const hashedPassword = await bcrypt.hash('admin123', 10);
-        await this.db.insert(schema.users).values({
-          name: 'Master Admin',
-          email: 'admin@greener.com',
-          password: hashedPassword,
-          role: 'admin',
-        });
-        this.logger.log('✅ Usuário Master inicial criado com sucesso: admin@greener.com (senha: admin123)');
+      if (adminExists) {
+        return;
       }
+
+      const email = process.env.ADMIN_EMAIL?.trim();
+      const password = process.env.ADMIN_PASSWORD?.trim();
+      const name = process.env.ADMIN_NAME?.trim() || 'Master Admin';
+
+      if (!email || !password) {
+        this.logger.warn(
+          'Seed do administrador inicial ignorado: defina ADMIN_EMAIL e ADMIN_PASSWORD para criá-lo automaticamente.',
+        );
+        return;
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+      await this.db.insert(schema.users).values({
+        name,
+        email: email.toLowerCase(),
+        password: hashedPassword,
+        role: 'admin',
+      });
+      this.logger.log(` Usuário Master inicial criado com sucesso: ${email.toLowerCase()}`);
     } catch (err: any) {
       this.logger.error(`Erro ao verificar/criar usuário master inicial: ${err.message}`);
     }
