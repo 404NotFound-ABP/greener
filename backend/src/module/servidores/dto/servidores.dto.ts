@@ -288,6 +288,15 @@ export class HistoricoServidorResponseDto {
   @ApiProperty({ example: 300, description: 'Janela de amostragem aplicada em segundos' })
   janela_amostragem_segundos!: number;
 
+  @ApiProperty({
+    example: { inicio: '2026-11-16T00:00:00.000Z', fim: '2026-11-16T23:59:59.000Z' },
+    description: 'Período utilizado para filtrar o histórico',
+  })
+  periodo!: {
+    inicio: Date | null;
+    fim: Date | null;
+  };
+
   @ApiProperty({ example: 30 })
   total_pontos!: number;
 

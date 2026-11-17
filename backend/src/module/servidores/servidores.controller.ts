@@ -83,18 +83,23 @@ export class ServidoresController {
 
     @ApiTags('Frontend - Banco de Dados')
     @Get(':id/historico')
-    @ApiOperation({ summary: 'Série temporal das medições de um servidor para gráficos' })
+    @ApiOperation({ summary: 'Série temporal das medições de um servidor para gráficos (com filtro opcional por data inicial e final — RF10)' })
     @ApiParam({ name: 'id', description: 'ID do servidor (ex: billing-api)' })
     @ApiQuery({ name: 'limite', required: false, description: 'Quantidade máxima de pontos (padrão: 30)' })
     @ApiQuery({ name: 'janelaSegundos', required: false, description: 'Janela de amostragem em segundos (300, 900, 1800, 3600, 86400, 2592000). Padrão: configurado no sistema' })
+    @ApiQuery({ name: 'dataInicial', required: false, description: 'Data/hora inicial em ISO 8601 (ex: 2026-11-16T00:00:00Z)' })
+    @ApiQuery({ name: 'dataFinal', required: false, description: 'Data/hora final em ISO 8601 (ex: 2026-11-16T23:59:59Z)' })
     @ApiResponse({ status: 200, description: 'Pontos históricos de telemetria do servidor', type: HistoricoServidorResponseDto })
+    @ApiResponse({ status: 400, description: 'Parâmetro de data ou janela inválido' })
     async getHistoricoServidor(
         @Param('id') id: string,
         @Query('limite') limite?: string,
         @Query('janelaSegundos') janelaSegundos?: string,
+        @Query('dataInicial') dataInicial?: string,
+        @Query('dataFinal') dataFinal?: string,
     ): Promise<HistoricoServidorResponseDto> {
         const janela = janelaSegundos !== undefined ? Number(janelaSegundos) : undefined;
-        return this.servidoresService.getHistoricoServidor(id, Number(limite) || 30, janela);
+        return this.servidoresService.getHistoricoServidor(id, Number(limite) || 30, janela, dataInicial, dataFinal);
     }
 
     @ApiTags('APIs Externas - Tempo Real')

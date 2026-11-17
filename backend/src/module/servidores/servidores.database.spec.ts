@@ -518,5 +518,44 @@ describe('ServidoresService — consultas do banco', () => {
       expect(comparativoCustom.janela_amostragem_segundos).toBe(86400);
       await expect(serviceComConfig.getComparativo(undefined, 45)).rejects.toBeInstanceOf(BadRequestException);
     });
+
+    it('RF10: filtra histórico por dataInicial e dataFinal, informa período e ordena cronologicamente', async () => {
+      // Arrange
+      const recente = coleta('0.02', '8', '2026-11-12T12:00:00Z');
+      const antiga = coleta('0.01', '4', '2026-11-12T10:00:00Z');
+      contexto.fila.push([servidor('a')], [recente, antiga]);
+
+      // Act
+      const resultado = await contexto.service.getHistoricoServidor(
+        'a',
+        30,
+        undefined,
+        '2026-11-12T09:00:00Z',
+        '2026-11-12T13:00:00Z',
+      );
+
+      // Assert
+      expect(resultado.periodo).toEqual({
+        inicio: new Date('2026-11-12T09:00:00Z'),
+        fim: new Date('2026-11-12T13:00:00Z'),
+      });
+      expect(resultado.pontos.map((p) => p.timestamp)).toEqual([antiga.coletadoEm, recente.coletadoEm]);
+    });
+
+    it('RF10: recusa datas inválidas ou dataInicial posterior a dataFinal', async () => {
+      await expect(
+        contexto.service.getHistoricoServidor('a', 30, undefined, 'data-invalida', undefined),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      await expect(
+        contexto.service.getHistoricoServidor(
+          'a',
+          30,
+          undefined,
+          '2026-11-12T15:00:00Z',
+          '2026-11-12T10:00:00Z',
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
   });
 });

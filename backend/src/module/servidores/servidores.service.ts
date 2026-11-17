@@ -8,7 +8,7 @@ import {
     INTERVALOS_PERMITIDOS_SEGUNDOS,
     IntervalosConfigService,
 } from "@/database/intervalos-config.service";
-import { and, eq, desc, gte, sql } from "drizzle-orm";
+import { and, eq, desc, gte, lte, sql } from "drizzle-orm";
 
 function parseNumeroOuNulo(valor: unknown): number | null {
     if (valor === null || valor === undefined || valor === '') {
@@ -221,10 +221,40 @@ export class ServidoresService {
         };
     }
 
-    // Histórico de medições de um servidor para gráficos temporais dentro da janela de amostragem
-    async getHistoricoServidor(idServidor: string, limite: number = 30, janelaSegundos?: number) {
+    private parseDataParametro(valor: string | undefined, nomeCampo: string): Date | undefined {
+        if (valor === undefined || valor.trim() === '') {
+            return undefined;
+        }
+        const data = new Date(valor);
+        if (Number.isNaN(data.getTime())) {
+            throw new BadRequestException(`${nomeCampo} inválida. Use formato ISO 8601 (ex: 2026-11-16T00:00:00Z).`);
+        }
+        return data;
+    }
+
+    // Histórico de medições de um servidor para gráficos temporais dentro do período/janela
+    async getHistoricoServidor(
+        idServidor: string,
+        limite: number = 30,
+        janelaSegundos?: number,
+        dataInicial?: string,
+        dataFinal?: string,
+    ) {
+        const inicioInformado = this.parseDataParametro(dataInicial, 'dataInicial');
+        const fimInformado = this.parseDataParametro(dataFinal, 'dataFinal');
+
+        if (inicioInformado && fimInformado && inicioInformado > fimInformado) {
+            throw new BadRequestException('dataInicial não pode ser posterior a dataFinal.');
+        }
+
         const janela = this.resolverJanelaSegundos(janelaSegundos);
-        const dataCorte = new Date(Date.now() - janela * 1000);
+        const agora = new Date();
+        const usarPeriodoExplicito = Boolean(inicioInformado || fimInformado);
+        const inicioEfetivo = usarPeriodoExplicito
+            ? (inicioInformado ?? null)
+            : new Date(agora.getTime() - janela * 1000);
+        const fimEfetivo = usarPeriodoExplicito ? (fimInformado ?? null) : agora;
+
         // Valida se o servidor existe no banco
         const [servidor] = await this.db
             .select()
@@ -236,15 +266,18 @@ export class ServidoresService {
             throw new NotFoundException(`Servidor '${idServidor}' não encontrado no histórico`);
         }
 
+        const condicoes = [eq(schema.coletasMetricas.servidorId, idServidor)];
+        if (inicioEfetivo) {
+            condicoes.push(gte(schema.coletasMetricas.coletadoEm, inicioEfetivo));
+        }
+        if (fimEfetivo) {
+            condicoes.push(lte(schema.coletasMetricas.coletadoEm, fimEfetivo));
+        }
+
         const medicaoesDesc = await this.db
             .select()
             .from(schema.coletasMetricas)
-            .where(
-                and(
-                    eq(schema.coletasMetricas.servidorId, idServidor),
-                    gte(schema.coletasMetricas.coletadoEm, dataCorte),
-                ),
-            )
+            .where(and(...condicoes))
             .orderBy(desc(schema.coletasMetricas.coletadoEm))
             .limit(limite);
 
@@ -269,6 +302,10 @@ export class ServidoresService {
                 codigo_regiao: servidor.codigoRegiao,
             },
             janela_amostragem_segundos: janela,
+            periodo: {
+                inicio: inicioEfetivo,
+                fim: fimEfetivo,
+            },
             total_pontos: pontos.length,
             pontos,
         };
