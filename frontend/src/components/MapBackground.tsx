@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Tooltip, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import * as L from 'leaflet';
@@ -8,10 +8,20 @@ import type { ModalServiceData } from './ServiceModal';
 import { Sidebar } from './Sidebar';
 import type { MobileSheetView } from './Sidebar';
 import type { MainTab } from './MainLayout';
+import type { ServiceData } from '../types/service';
+import { matchesServiceStatus } from '../config/statusConfig';
+import {
+  CallbackServiceRepository,
+  defaultServiceRepository,
+  type ServiceRepository
+} from '../adapters/serviceAdapter';
+import { useServicesPolling } from '../hooks/useServicesPolling';
 
 export interface MapBackgroundProps {
   onLogout?: () => void;
   onSelectTab?: (tab: MainTab) => void;
+  repository?: ServiceRepository;
+  onFetchServices?: () => Promise<ServiceData[]>;
 }
 
 const themes = {
@@ -32,13 +42,120 @@ const previewTiles = {
   dark: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/13/4655/3050'
 };
 
-const mapMarkersData: (ModalServiceData & { coords: [number, number] })[] = [
-  { id: 1, name: 'ASTAH-XYZ', status: 'ativo', location: 'Jacareí', coords: [-23.3053, -45.9658] },
-  { id: 2, name: 'ASTAH-PQR', status: 'indisponível', location: 'Caçapava', coords: [-23.1000, -45.7000] },
-  { id: 3, name: 'ASTAH-STU', status: 'sem_metricas', location: 'Taubaté', coords: [-23.0333, -45.5500] }
-];
+/**
+ * Extrai e valida coordenadas de múltiplos formatos possíveis vindos da API.
+ * Retorna null quando ausentes, nulas, vazias ou fora da faixa geográfica válida.
+ */
+export function extractValidCoordinates(service: ServiceData): [number, number] | null {
+  const raw = service as ServiceData & {
+    coordenadas?:
+      | {
+          lat?: number | null;
+          lng?: number | null;
+          latitude?: number | null;
+          longitude?: number | null;
+        }
+      | [number, number]
+      | null;
+    coords?: [number, number] | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    lat?: number | null;
+    lng?: number | null;
+  };
 
-export const MapBackground: React.FC<MapBackgroundProps> = ({ onLogout, onSelectTab }) => {
+  let lat: number | null | undefined;
+  let lng: number | null | undefined;
+
+  if (Array.isArray(raw.coords)) {
+    [lat, lng] = raw.coords;
+  } else if (Array.isArray(raw.coordenadas)) {
+    [lat, lng] = raw.coordenadas;
+  } else if (raw.coordenadas && typeof raw.coordenadas === 'object' && !Array.isArray(raw.coordenadas)) {
+    lat = raw.coordenadas.lat ?? raw.coordenadas.latitude;
+    lng = raw.coordenadas.lng ?? raw.coordenadas.longitude;
+  } else {
+    lat = raw.latitude ?? raw.lat;
+    lng = raw.longitude ?? raw.lng;
+  }
+
+  if (
+    typeof lat !== 'number' ||
+    typeof lng !== 'number' ||
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lng) ||
+    lat < -90 ||
+    lat > 90 ||
+    lng < -180 ||
+    lng > 180
+  ) {
+    return null;
+  }
+
+  return [lat, lng];
+}
+
+/**
+ * Formata a localização textual tratando ausência parcial ou total de cidade, região e país (T23.2/US10).
+ */
+export function formatServiceLocation(localizacao?: {
+  cidade?: string | null;
+  regiao?: string | null;
+  pais?: string | null;
+} | null): { text: string; isIncomplete: boolean } {
+  const cidade = localizacao?.cidade?.trim() || '';
+  const regiao = localizacao?.regiao?.trim() || '';
+  const pais = localizacao?.pais?.trim() || '';
+
+  const parts = [cidade, regiao, pais].filter(Boolean);
+
+  if (parts.length === 0) {
+    return { text: 'Localização não informada', isIncomplete: true };
+  }
+
+  if (parts.length < 3) {
+    const missing: string[] = [];
+    if (!cidade) missing.push('cidade');
+    if (!regiao) missing.push('região');
+    if (!pais) missing.push('país');
+
+    return {
+      text: `${parts.join(', ')} (${missing.join('/')} não informado)`,
+      isIncomplete: true
+    };
+  }
+
+  return { text: parts.join(', '), isIncomplete: false };
+}
+
+function mapStatusToModalStatus(status: string): ModalServiceData['status'] {
+  const normalized = status?.toLowerCase().trim();
+  if (normalized === 'ativo' || normalized === 'online' || normalized === 'active') {
+    return 'ativo';
+  }
+  if (normalized === 'indisponivel' || normalized === 'indisponível' || normalized === 'offline' || normalized === 'inactive') {
+    return 'indisponível';
+  }
+  return 'sem_metricas';
+}
+
+function toModalServiceData(service: ServiceData): ModalServiceData {
+  const loc = formatServiceLocation(service.localizacao);
+  return {
+    ...(service as unknown as ModalServiceData),
+    id: service.id,
+    name: service.nome || 'Serviço sem nome',
+    status: mapStatusToModalStatus(service.status),
+    location: loc.text
+  };
+}
+
+export const MapBackground: React.FC<MapBackgroundProps> = ({
+  onLogout,
+  onSelectTab,
+  repository,
+  onFetchServices
+}) => {
   const [currentTheme, setCurrentTheme] = useState<'dark' | 'satellite'>('dark');
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
   const [mobileSheetView, setMobileSheetView] = useState<MobileSheetView>('filters');
@@ -47,12 +164,24 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({ onLogout, onSelect
   const menuContainerRef = useRef<HTMLDivElement | null>(null);
 
   const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
+  const [tileErrorCount, setTileErrorCount] = useState(0);
+  const [tileRetryKey, setTileRetryKey] = useState(0);
+  const [selectedListService, setSelectedListService] = useState<ServiceData | null>(null);
 
   const [activeFilters, setActiveFilters] = useState({
     ativo: true,
     indisponível: true,
     sem_metricas: true
   });
+
+  const resolvedRepository = useMemo<ServiceRepository>(() => {
+    if (repository) return repository;
+    if (onFetchServices) return new CallbackServiceRepository(onFetchServices);
+    return defaultServiceRepository;
+  }, [repository, onFetchServices]);
+
+  const pollingState = useServicesPolling({ repository: resolvedRepository });
+  const { services, isRefreshing, hasError, triggerRefresh } = pollingState;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -93,18 +222,62 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({ onLogout, onSelect
   };
 
   const toggleTheme = () => {
+    setTileErrorCount(0);
     setCurrentTheme(prev => (prev === 'dark' ? 'satellite' : 'dark'));
   };
 
-  const getMarkerColor = (status: string) => {
+  const handleRetryMap = () => {
+    setTileErrorCount(0);
+    setTileRetryKey(prev => prev + 1);
+    void triggerRefresh();
+  };
+
+  const getMarkerColor = (status: ModalServiceData['status']) => {
     if (status === 'ativo') return '#2FA862';
     if (status === 'indisponível') return '#9C2A2A';
     return '#B8B7B8';
   };
 
-  const filteredMarkers = mapMarkersData.filter(
-    marker => activeFilters[marker.status as keyof typeof activeFilters]
+  const filteredServices = useMemo(
+    () => services.filter(service => matchesServiceStatus(service.status, activeFilters)),
+    [services, activeFilters]
   );
+
+  const { mappableMarkers, servicesWithoutCoordsCount } = useMemo(() => {
+    const valid: { service: ServiceData; modalData: ModalServiceData; coords: [number, number] }[] = [];
+    let missingCoords = 0;
+
+    for (const service of filteredServices) {
+      const coords = extractValidCoordinates(service);
+      if (coords) {
+        valid.push({
+          service,
+          modalData: toModalServiceData(service),
+          coords
+        });
+      } else {
+        missingCoords += 1;
+      }
+    }
+
+    return { mappableMarkers: valid, servicesWithoutCoordsCount: missingCoords };
+  }, [filteredServices]);
+
+  const handleSelectServiceFromList = (service: ServiceData) => {
+    const coords = extractValidCoordinates(service);
+    if (coords && mapInstance) {
+      mapInstance.flyTo(coords, Math.max(mapInstance.getZoom(), 13), { duration: 0.7 });
+      setSelectedListService(null);
+    } else {
+      // Serviço sem coordenadas: abre os detalhes diretamente em modal sem depender do mapa
+      setSelectedListService(service);
+    }
+  };
+
+  const handleOpenServicesList = () => {
+    setIsSidebarMinimized(false);
+    setMobileSheetView('list');
+  };
 
   const handleMobileBackClick = () => {
     if (mobileSheetView === 'list') {
@@ -123,9 +296,12 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({ onLogout, onSelect
       ? 'bottom-[348px]'
       : 'bottom-[68px]';
 
+  const hasMapLayerFailure = tileErrorCount >= 4;
+  const isInitialLoading = isRefreshing && services.length === 0;
+  const showEmptyMarkersBanner = !isInitialLoading && mappableMarkers.length === 0;
+
   return (
     <div className={`relative w-full h-full bg-neutro-900 ${themes[currentTheme].cssClass}`}>
-      
       {/* =========================================================
           COMPONENTE 1: BARRA LATERAL (Desktop) / BOTTOM SHEET (Mobile)
           ========================================================= */}
@@ -138,6 +314,9 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({ onLogout, onSelect
         setIsMinimized={setIsSidebarMinimized}
         mobileSheetView={mobileSheetView}
         setMobileSheetView={setMobileSheetView}
+        repository={resolvedRepository}
+        pollingState={pollingState}
+        onSelectService={handleSelectServiceFromList}
       />
 
       <style>{`
@@ -162,29 +341,185 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({ onLogout, onSelect
         zoomControl={false}
       >
         <TileLayer
-          key={currentTheme}
+          key={`${currentTheme}-${tileRetryKey}`}
           attribution={themes[currentTheme].attribution}
           url={themes[currentTheme].url}
+          eventHandlers={{
+            tileerror: () => setTileErrorCount(prev => prev + 1),
+            tileload: () => {
+              if (tileErrorCount > 0) setTileErrorCount(0);
+            }
+          }}
         />
 
-        {filteredMarkers.map(marker => (
+        {mappableMarkers.map(({ service, modalData, coords }) => (
           <CircleMarker
-            key={marker.id}
-            center={marker.coords}
+            key={service.id}
+            center={coords}
             pathOptions={{
-              color: getMarkerColor(marker.status),
-              fillColor: getMarkerColor(marker.status),
+              color: getMarkerColor(modalData.status),
+              fillColor: getMarkerColor(modalData.status),
               fillOpacity: 0.8
             }}
             radius={14}
           >
-            <Tooltip>{marker.name} (Clique para abrir)</Tooltip>
+            <Tooltip>{modalData.name} (Clique para abrir)</Tooltip>
             <Popup closeButton={false} offset={[0, -10]}>
-              <ServiceModal service={marker} />
+              <ServiceModal service={modalData} />
             </Popup>
           </CircleMarker>
         ))}
       </MapContainer>
+
+      {/* =========================================================
+          AVISOS INFORMATIVOS NÃO-BLOQUEANTES DO MAPA (T25.3/US17 #102)
+          ========================================================= */}
+      <div
+        className={`pointer-events-none absolute top-20 sm:top-4 right-4 sm:right-20 z-[1000] flex flex-col items-center sm:items-end gap-2 transition-all duration-300 ${
+          isSidebarMinimized ? 'left-4 sm:left-[290px]' : 'left-4 sm:left-[452px]'
+        }`}
+      >
+        {/* 1. Carregamento inicial */}
+        {isInitialLoading && (
+          <div
+            role="status"
+            className="pointer-events-auto px-3.5 py-2 rounded-full bg-[#081C12]/90 backdrop-blur-xl border border-[#2FA862]/60 text-[#F2FAF5] text-[12px] sm:text-[13px] flex items-center gap-2 shadow-xl"
+          >
+            <span className="w-2.5 h-2.5 rounded-full bg-[#22D55B] animate-ping shrink-0" />
+            <span>Carregando serviços e marcadores no mapa...</span>
+          </div>
+        )}
+
+        {/* 2. Falha no carregamento do mapa ou da API */}
+        {(hasMapLayerFailure || hasError) && (
+          <div
+            role="alert"
+            className="pointer-events-auto max-w-md px-4 py-2.5 rounded-[14px] bg-[#240B0B]/92 backdrop-blur-xl border border-[#F34F0E]/80 text-[#F2FAF5] text-[12px] sm:text-[13px] flex items-center justify-between gap-3 shadow-2xl"
+          >
+            <div className="flex flex-col min-w-0">
+              <span className="font-semibold text-[#FCA5A5]">
+                {hasMapLayerFailure
+                  ? 'Falha ao carregar camadas do mapa'
+                  : 'Falha ao sincronizar serviços'}
+              </span>
+              <span className="text-[#F2FAF5]/85 text-[11px] sm:text-[12px]">
+                A lista de serviços e os dashboards continuam disponíveis normalmente.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleRetryMap}
+              className="px-3 py-1.5 rounded-[10px] bg-[#9C2A2A] hover:bg-[#B83232] text-white text-[12px] font-medium shrink-0 transition-colors cursor-pointer"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        )}
+
+        {/* 3. Aviso de serviços sem coordenadas disponíveis na lista */}
+        {!isInitialLoading && servicesWithoutCoordsCount > 0 && mappableMarkers.length > 0 && (
+          <div className="pointer-events-auto px-3.5 py-2 rounded-[12px] bg-[#081C12]/90 backdrop-blur-xl border border-amber-400/50 text-[#F2FAF5] text-[12px] flex items-center gap-2.5 shadow-xl">
+            <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+            <span>
+              {servicesWithoutCoordsCount}{' '}
+              {servicesWithoutCoordsCount === 1
+                ? 'serviço sem coordenadas no mapa'
+                : 'serviços sem coordenadas no mapa'}
+            </span>
+            <button
+              type="button"
+              onClick={handleOpenServicesList}
+              className="underline text-amber-300 hover:text-amber-200 font-medium cursor-pointer whitespace-nowrap"
+            >
+              Acessar na lista
+            </button>
+          </div>
+        )}
+
+        {/* 4. Ausência total de marcadores no mapa (por filtro ou falta de coordenadas) */}
+        {showEmptyMarkersBanner && (
+          <div
+            role="status"
+            className="pointer-events-auto max-w-md px-4 py-3 rounded-[16px] bg-[#081C12]/92 backdrop-blur-xl border border-[#F2FAF5]/40 text-[#F2FAF5] text-[12px] sm:text-[13px] flex flex-col gap-2 shadow-2xl"
+          >
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" />
+              <span className="font-semibold">
+                {services.length === 0
+                  ? 'Nenhum serviço disponível no momento'
+                  : filteredServices.length === 0
+                  ? 'Nenhum marcador corresponde aos filtros selecionados'
+                  : 'Nenhum serviço filtrado possui coordenadas para exibição no mapa'}
+              </span>
+            </div>
+            <p className="text-[#DDF1E5]/85 text-[11px] sm:text-[12px] leading-relaxed">
+              {filteredServices.length > 0
+                ? `Há ${filteredServices.length} ${
+                    filteredServices.length === 1 ? 'serviço disponível' : 'serviços disponíveis'
+                  } para consulta na lista lateral e nos dashboards.`
+                : 'Ajuste os filtros de status ou consulte os demais painéis pelo menu.'}
+            </p>
+            <div className="flex items-center gap-2 pt-0.5 flex-wrap">
+              {filteredServices.length === 0 && services.length > 0 && (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="px-3 py-1.5 rounded-[10px] bg-[#1F8A4C] hover:bg-[#2FA862] text-white text-[12px] font-medium transition-colors cursor-pointer"
+                >
+                  Restaurar filtros
+                </button>
+              )}
+              {filteredServices.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleOpenServicesList}
+                  className="px-3 py-1.5 rounded-[10px] bg-[#1F8A4C] hover:bg-[#2FA862] text-white text-[12px] font-medium transition-colors cursor-pointer"
+                >
+                  Abrir lista de serviços ({filteredServices.length})
+                </button>
+              )}
+              {onSelectTab && (
+                <button
+                  type="button"
+                  onClick={() => onSelectTab('dashboards')}
+                  className="px-3 py-1.5 rounded-[10px] bg-[#F2FAF5]/15 hover:bg-[#F2FAF5]/25 border border-[#F2FAF5]/30 text-[#F2FAF5] text-[12px] font-medium transition-colors cursor-pointer"
+                >
+                  Ir para Dashboards
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* =========================================================
+          MODAL DE DETALHES PARA SERVIÇOS SELECIONADOS PELA LISTA
+          (Garante acesso total mesmo sem coordenadas no mapa)
+          ========================================================= */}
+      {selectedListService && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Detalhes de ${selectedListService.nome}`}
+          onClick={() => setSelectedListService(null)}
+          className="fixed inset-0 z-[1050] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="relative flex flex-col items-end gap-2"
+          >
+            <button
+              type="button"
+              onClick={() => setSelectedListService(null)}
+              aria-label="Fechar detalhes do serviço"
+              className="px-3 py-1 rounded-full bg-[#081C12] border border-[#F2FAF5]/50 text-[#F2FAF5] text-[12px] hover:bg-[#1F8A4C] transition-colors cursor-pointer"
+            >
+              Fechar ✕
+            </button>
+            <ServiceModal service={toModalServiceData(selectedListService)} />
+          </div>
+        </div>
+      )}
 
       {/* =========================================================
           BOTÃO VOLTAR CIRCULAR MOBILE - Canto Superior Esquerdo

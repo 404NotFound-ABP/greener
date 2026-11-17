@@ -11,6 +11,7 @@ import {
   type ServiceRepository
 } from '../adapters/serviceAdapter';
 import { useServicesPolling } from '../hooks/useServicesPolling';
+import { extractValidCoordinates, formatServiceLocation } from './MapBackground';
 
 export type MobileSheetView = 'filters' | 'list' | 'collapsed';
 
@@ -29,6 +30,8 @@ export interface SidebarProps {
   setMobileSheetView?: React.Dispatch<React.SetStateAction<MobileSheetView>>;
   repository?: ServiceRepository;
   onFetchServices?: () => Promise<ServiceData[]>;
+  pollingState?: ReturnType<typeof useServicesPolling>;
+  onSelectService?: (service: ServiceData) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -40,7 +43,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   mobileSheetView,
   setMobileSheetView,
   repository,
-  onFetchServices
+  onFetchServices,
+  pollingState,
+  onSelectService
 }) => {
   const [internalSheetView, setInternalSheetView] = useState<MobileSheetView>('filters');
   const currentSheetView = mobileSheetView ?? internalSheetView;
@@ -60,6 +65,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return defaultServiceRepository;
   }, [repository, onFetchServices]);
 
+  const internalPolling = useServicesPolling({ repository: resolvedRepository });
   const {
     services,
     lastUpdate,
@@ -69,7 +75,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     isStale,
     togglePause,
     triggerRefresh
-  } = useServicesPolling({ repository: resolvedRepository });
+  } = pollingState ?? internalPolling;
 
   const handleClearMobileFilters = () => {
     setSearchTerm('');
@@ -87,12 +93,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const matchesStatus = matchesServiceStatus(service.status, activeFilters);
 
     const term = searchTerm.toLowerCase().trim();
+    const nome = (service.nome ?? '').toLowerCase();
+    const cidade = (service.localizacao?.cidade ?? '').toLowerCase();
+    const regiao = (service.localizacao?.regiao ?? '').toLowerCase();
+    const pais = (service.localizacao?.pais ?? '').toLowerCase();
+
     const matchesSearch =
       !term ||
-      service.nome.toLowerCase().includes(term) ||
-      (service.localizacao?.cidade || '').toLowerCase().includes(term) ||
-      (service.localizacao?.regiao || '').toLowerCase().includes(term) ||
-      (service.localizacao?.pais || '').toLowerCase().includes(term);
+      nome.includes(term) ||
+      cidade.includes(term) ||
+      regiao.includes(term) ||
+      pais.includes(term) ||
+      (term.includes('sem coordenada') && !extractValidCoordinates(service)) ||
+      (term.includes('não informad') && formatServiceLocation(service.localizacao).isIncomplete);
 
     return matchesStatus && matchesSearch;
   });
@@ -112,6 +125,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
     : isStale
     ? 'Dados antigos · reconectando...'
     : 'Atualizando a cada 5s';
+
+  const renderServiceItem = (service: ServiceData) => {
+    const hasCoords = Boolean(extractValidCoordinates(service));
+    const locationInfo = formatServiceLocation(service.localizacao);
+
+    return (
+      <div
+        key={service.id}
+        onClick={() => onSelectService?.(service)}
+        className={`self-stretch flex flex-col gap-1 ${onSelectService ? 'cursor-pointer' : ''}`}
+      >
+        <ServiceCard service={service} />
+
+        {/* Indicadores explícitos para localização incompleta (#96) ou ausência de coordenadas (#102) */}
+        {(locationInfo.isIncomplete || !hasCoords) && (
+          <div className="px-2.5 py-1 rounded-[8px] bg-[#081C12]/70 border border-[#F2FAF5]/15 flex items-center justify-between gap-2 text-[11px] text-[#DDF1E5]/85">
+            {locationInfo.isIncomplete && (
+              <span className="truncate" title={locationInfo.text}>
+                Localização: {locationInfo.text}
+              </span>
+            )}
+            {!hasCoords && (
+              <span className="px-1.5 py-0.5 rounded bg-amber-400/15 border border-amber-400/40 text-amber-300 font-medium whitespace-nowrap shrink-0">
+                Sem coordenadas no mapa
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <>
@@ -172,7 +216,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Pesquise por um serviço aqui"
+              placeholder="Pesquise por nome, cidade, região ou país"
               className="w-full bg-transparent text-white placeholder-white/85 text-[14px] font-normal leading-[20px] focus:outline-none"
             />
           </div>
@@ -304,9 +348,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
 
               <div className="self-stretch flex-1 overflow-y-auto flex flex-col gap-[8px] pr-[2px]">
-                {filteredServices.map((service) => (
-                  <ServiceCard key={service.id} service={service} />
-                ))}
+                {filteredServices.length > 0 ? (
+                  filteredServices.map(renderServiceItem)
+                ) : (
+                  <div className="self-stretch py-6 px-4 rounded-[12px] bg-[#166A3E]/15 border border-[#2FA862]/30 text-center text-[#DDF1E5]/85 text-[13px]">
+                    Nenhum serviço encontrado para os filtros ou busca atuais.
+                  </div>
+                )}
               </div>
 
               <div className="self-stretch pt-[2px] flex justify-between items-center gap-2 text-[12px] shrink-0">
@@ -452,7 +500,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Busque o serviço"
+              placeholder="Busque por serviço ou localização"
               className="w-full bg-transparent text-white placeholder-white/90 text-[12px] font-normal leading-[16px] focus:outline-none"
             />
           </div>
@@ -589,14 +637,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* 3. SEÇÃO: LISTA DE SERVIÇOS */}
         <div className="self-stretch flex-1 px-[10px] overflow-hidden flex flex-col justify-start items-start gap-[10px]">
-          <span className="text-white text-[20px] font-medium leading-[28px]">
-            Serviços
-          </span>
+          <div className="self-stretch flex items-center justify-between">
+            <span className="text-white text-[20px] font-medium leading-[28px]">
+              Serviços
+            </span>
+            <span className="text-[#DDF1E5]/80 text-[12px]">
+              {filteredServices.length} de {services.length}
+            </span>
+          </div>
 
           <div className="self-stretch flex-1 overflow-y-auto flex flex-col justify-start items-start gap-[10px] pr-[6px] [&::-webkit-scrollbar]:w-[4px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-[#2FA862]/50 hover:[&::-webkit-scrollbar-thumb]:bg-[#2FA862] [&::-webkit-scrollbar-thumb]:rounded-full [scrollbar-width:thin] [scrollbar-color:rgba(47,168,98,0.5)_transparent]">
-            {filteredServices.map((service) => (
-              <ServiceCard key={service.id} service={service} />
-            ))}
+            {filteredServices.length > 0 ? (
+              filteredServices.map(renderServiceItem)
+            ) : (
+              <div className="self-stretch py-6 px-4 rounded-[12px] bg-[#166A3E]/15 border border-[#2FA862]/30 text-center text-[#DDF1E5]/85 text-[13px]">
+                Nenhum serviço encontrado para os filtros ou busca atuais.
+              </div>
+            )}
           </div>
         </div>
 
