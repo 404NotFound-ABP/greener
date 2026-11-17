@@ -16,19 +16,26 @@ export class ServidoresController {
     @ApiTags('Frontend - Banco de Dados')
     @Get('dashboard')
     @ApiOperation({ summary: 'Dados consolidados para o dashboard do frontend (resumo + servidores + última telemetria)' })
+    @ApiQuery({ name: 'janelaSegundos', required: false, description: 'Janela de amostragem em segundos (300, 900, 1800, 3600, 86400, 2592000). Padrão: configurado no sistema' })
     @ApiResponse({ status: 200, description: 'Resumo geral e lista de servidores com última coleta', type: DashboardResponseDto })
-    async getDashboard(): Promise<DashboardResponseDto> {
-        return this.servidoresService.getDashboardData();
+    async getDashboard(@Query('janelaSegundos') janelaSegundos?: string): Promise<DashboardResponseDto> {
+        const janela = janelaSegundos !== undefined ? Number(janelaSegundos) : undefined;
+        return this.servidoresService.getDashboardData(janela);
     }
 
     @ApiTags('Frontend - Banco de Dados')
     @Get('comparativo')
     @ApiOperation({ summary: 'Compara consumo de energia e emissões entre servidores' })
     @ApiQuery({ name: 'ids', required: false, description: 'IDs dos servidores separados por vírgula (ex: billing-api,checkout-worker)' })
+    @ApiQuery({ name: 'janelaSegundos', required: false, description: 'Janela de amostragem em segundos (300, 900, 1800, 3600, 86400, 2592000). Padrão: configurado no sistema' })
     @ApiResponse({ status: 200, description: 'Comparativo entre servidores selecionados', type: ComparativoResponseDto })
-    async getComparativo(@Query('ids') ids?: string): Promise<ComparativoResponseDto> {
+    async getComparativo(
+        @Query('ids') ids?: string,
+        @Query('janelaSegundos') janelaSegundos?: string,
+    ): Promise<ComparativoResponseDto> {
         const idList = ids ? ids.split(',').map((id) => id.trim()).filter(Boolean) : undefined;
-        return this.servidoresService.getComparativo(idList);
+        const janela = janelaSegundos !== undefined ? Number(janelaSegundos) : undefined;
+        return this.servidoresService.getComparativo(idList, janela);
     }
 
     @ApiTags('Frontend - Banco de Dados')
@@ -38,18 +45,22 @@ export class ServidoresController {
     @ApiQuery({ name: 'ordem', required: false, enum: ['desc', 'asc'], description: 'Direção da ordenação (padrão: desc)' })
     @ApiQuery({ name: 'criterio', required: false, enum: ['acumulado', 'instantaneo'], description: 'Critério: acumulado histórico ou instantâneo última coleta (padrão: acumulado)' })
     @ApiQuery({ name: 'limite', required: false, description: 'Quantidade máxima no ranking (padrão: 10)' })
+    @ApiQuery({ name: 'janelaSegundos', required: false, description: 'Janela de amostragem em segundos (300, 900, 1800, 3600, 86400, 2592000). Padrão: configurado no sistema' })
     @ApiResponse({ status: 200, description: 'Ranking de servidores ordenado', type: RankingResponseDto })
     async getRanking(
         @Query('ordenarPor') ordenarPor?: 'emissoes' | 'energia',
         @Query('ordem') ordem?: 'desc' | 'asc',
         @Query('criterio') criterio?: 'acumulado' | 'instantaneo',
         @Query('limite') limite?: string,
+        @Query('janelaSegundos') janelaSegundos?: string,
     ): Promise<RankingResponseDto> {
+        const janela = janelaSegundos !== undefined ? Number(janelaSegundos) : undefined;
         return this.servidoresService.getRankingServidores(
             ordenarPor,
             ordem,
             criterio,
             Number(limite) || 10,
+            janela,
         );
     }
 
@@ -57,12 +68,17 @@ export class ServidoresController {
     @Get()
     @ApiOperation({ summary: 'Lista os servidores (do banco de dados ou da API externa via ?origem=externa)' })
     @ApiQuery({ name: 'origem', required: false, enum: ['banco', 'externa'], description: 'Fonte dos dados (padrão: banco)' })
+    @ApiQuery({ name: 'janelaSegundos', required: false, description: 'Janela de amostragem em segundos (300, 900, 1800, 3600, 86400, 2592000). Padrão: configurado no sistema' })
     @ApiResponse({ status: 200, description: 'Lista de servidores com metadados regionais e última coleta', type: [ServidorComRegiaoDto] })
-    async listServidores(@Query('origem') origem?: string): Promise<any> {
+    async listServidores(
+        @Query('origem') origem?: string,
+        @Query('janelaSegundos') janelaSegundos?: string,
+    ): Promise<any> {
         if (origem === 'externa') {
             return this.servidoresService.listServidores();
         }
-        return this.servidoresService.listServidoresDoBanco();
+        const janela = janelaSegundos !== undefined ? Number(janelaSegundos) : undefined;
+        return this.servidoresService.listServidoresDoBanco(janela);
     }
 
     @ApiTags('Frontend - Banco de Dados')
@@ -70,12 +86,15 @@ export class ServidoresController {
     @ApiOperation({ summary: 'Série temporal das medições de um servidor para gráficos' })
     @ApiParam({ name: 'id', description: 'ID do servidor (ex: billing-api)' })
     @ApiQuery({ name: 'limite', required: false, description: 'Quantidade máxima de pontos (padrão: 30)' })
+    @ApiQuery({ name: 'janelaSegundos', required: false, description: 'Janela de amostragem em segundos (300, 900, 1800, 3600, 86400, 2592000). Padrão: configurado no sistema' })
     @ApiResponse({ status: 200, description: 'Pontos históricos de telemetria do servidor', type: HistoricoServidorResponseDto })
     async getHistoricoServidor(
         @Param('id') id: string,
         @Query('limite') limite?: string,
+        @Query('janelaSegundos') janelaSegundos?: string,
     ): Promise<HistoricoServidorResponseDto> {
-        return this.servidoresService.getHistoricoServidor(id, Number(limite) || 30);
+        const janela = janelaSegundos !== undefined ? Number(janelaSegundos) : undefined;
+        return this.servidoresService.getHistoricoServidor(id, Number(limite) || 30, janela);
     }
 
     @ApiTags('APIs Externas - Tempo Real')

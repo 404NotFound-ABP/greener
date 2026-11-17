@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { HttpService } from '@nestjs/axios';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import type { DrizzleDB } from '@/database';
+import { IntervalosConfigService } from '@/database/intervalos-config.service';
 import * as schema from '@/database/schema';
 
 const carregarAmbiente = jest.fn(() => {
@@ -480,6 +481,42 @@ describe('ServidoresService — consultas do banco', () => {
         nome: 'Serviço b',
         regiao: { codigo: 'br-sudeste', latitude: null, longitude: null },
       });
+    });
+
+    it('usa intervalo_atualizacao_segundos padrão de IntervalosConfigService e aceita janelaSegundos válida', async () => {
+      // Arrange
+      const intervalosConfig = new IntervalosConfigService();
+      intervalosConfig.setIntervalos(300, 1800, new Date('2026-11-16T23:00:00Z'));
+      const serviceComConfig = new ServidoresService(
+        {} as HttpService,
+        {
+          select: () => ({
+            from: () => {
+              const q: Record<string, unknown> = {
+                where: () => q,
+                orderBy: () => q,
+                innerJoin: () => q,
+                leftJoin: () => q,
+                limit: async () => [],
+                then: (res: (v: unknown[]) => unknown) => Promise.resolve([]).then(res),
+              };
+              return q;
+            },
+          }),
+        } as unknown as DrizzleDB,
+        intervalosConfig,
+      );
+
+      // Act
+      const padrao = await serviceComConfig.getHistoricoServidor('a').catch(() => null);
+      const comparativoPadrao = await serviceComConfig.getComparativo();
+      const comparativoCustom = await serviceComConfig.getComparativo(undefined, 86400);
+
+      // Assert
+      expect(padrao).toBeNull(); // select() vazio retorna 404 para servidor 'a'
+      expect(comparativoPadrao.janela_amostragem_segundos).toBe(1800);
+      expect(comparativoCustom.janela_amostragem_segundos).toBe(86400);
+      await expect(serviceComConfig.getComparativo(undefined, 45)).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 });

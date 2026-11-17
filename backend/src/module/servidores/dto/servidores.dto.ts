@@ -106,6 +106,12 @@ export class ResumoDashboardDto {
   @ApiProperty({ example: '2026-10-25T20:47:18.311Z', nullable: true })
   periodo_fim!: Date | null;
 
+  @ApiProperty({ example: 300, description: 'Janela de amostragem aplicada em segundos' })
+  janela_amostragem_segundos!: number;
+
+  @ApiProperty({ example: 300, description: 'Intervalo de atualização configurado para o frontend em segundos' })
+  intervalo_atualizacao_segundos!: number;
+
   @ApiProperty({ example: 485.2, description: 'Soma da potência instantânea de todos os servidores ativos em Watts' })
   potencia_atual_watts!: number;
 
@@ -181,6 +187,9 @@ export class RankingResponseDto {
   @ApiProperty({ example: 'desc', enum: ['desc', 'asc'] })
   direcao!: string;
 
+  @ApiProperty({ example: 300, description: 'Janela de amostragem aplicada em segundos' })
+  janela_amostragem_segundos!: number;
+
   @ApiProperty({ example: 8 })
   total!: number;
 
@@ -221,6 +230,9 @@ export class ComparativoItemDto {
 }
 
 export class ComparativoResponseDto {
+  @ApiProperty({ example: 300, description: 'Janela de amostragem aplicada em segundos' })
+  janela_amostragem_segundos!: number;
+
   @ApiProperty({ example: 2 })
   total_comparados!: number;
 
@@ -272,6 +284,9 @@ export class HistoricoServidorResponseDto {
     status: string;
     codigo_regiao: string | null;
   };
+
+  @ApiProperty({ example: 300, description: 'Janela de amostragem aplicada em segundos' })
+  janela_amostragem_segundos!: number;
 
   @ApiProperty({ example: 30 })
   total_pontos!: number;

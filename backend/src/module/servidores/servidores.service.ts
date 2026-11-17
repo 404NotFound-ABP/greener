@@ -1,9 +1,14 @@
 import { HttpService } from "@nestjs/axios";
 import { config } from "@/config/config";
 import { ServidorResponse, ServidorMetricsData } from "@/module/interface/servidor.interface";
-import { Injectable, InternalServerErrorException, NotFoundException, Inject } from "@nestjs/common";
+import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException, Inject, Optional } from "@nestjs/common";
 import { DRIZZLE_PROVIDER, DrizzleDB, schema } from "@/database";
-import { eq, desc, inArray, sql } from "drizzle-orm";
+import {
+    INTERVALO_PADRAO_SEGUNDOS,
+    INTERVALOS_PERMITIDOS_SEGUNDOS,
+    IntervalosConfigService,
+} from "@/database/intervalos-config.service";
+import { and, eq, desc, gte, sql } from "drizzle-orm";
 
 function parseNumeroOuNulo(valor: unknown): number | null {
     if (valor === null || valor === undefined || valor === '') {
@@ -25,7 +30,21 @@ export class ServidoresService {
     constructor(
         private readonly httpService: HttpService,
         @Inject(DRIZZLE_PROVIDER) private readonly db: DrizzleDB,
+        @Optional() private readonly intervalosConfig?: IntervalosConfigService,
     ) {}
+
+    private resolverJanelaSegundos(janelaSegundos?: number): number {
+        if (janelaSegundos !== undefined) {
+            const permitidos = INTERVALOS_PERMITIDOS_SEGUNDOS as readonly number[];
+            if (!Number.isInteger(janelaSegundos) || !permitidos.includes(janelaSegundos)) {
+                throw new BadRequestException(
+                    `janelaSegundos inválida. Valores permitidos: ${permitidos.join(', ')}.`,
+                );
+            }
+            return janelaSegundos;
+        }
+        return this.intervalosConfig?.getIntervaloAtualizacaoSegundos() ?? INTERVALO_PADRAO_SEGUNDOS;
+    }
 
     // 1. Chamadas externas diretas ao Agregador de Métricas
     async listServidores(): Promise<ServidorResponse[]> {
@@ -73,8 +92,10 @@ export class ServidoresService {
 
     // Consultas ao Banco de Dados (PostgreSQL) para entrega ao Frontend
 
-    // Retorna todos os servidores cadastrados no banco com seus metadados de região e última coleta
-    async listServidoresDoBanco() {
+    // Retorna todos os servidores cadastrados no banco com seus metadados de região e última coleta na janela
+    async listServidoresDoBanco(janelaSegundos?: number) {
+        const janela = this.resolverJanelaSegundos(janelaSegundos);
+        const dataCorte = new Date(Date.now() - janela * 1000);
         const servidores = await this.db
             .select({
                 id: schema.servidores.id,
@@ -104,7 +125,12 @@ export class ServidoresService {
                 const [ultimaMedicao] = await this.db
                     .select()
                     .from(schema.coletasMetricas)
-                    .where(eq(schema.coletasMetricas.servidorId, s.id))
+                    .where(
+                        and(
+                            eq(schema.coletasMetricas.servidorId, s.id),
+                            gte(schema.coletasMetricas.coletadoEm, dataCorte),
+                        ),
+                    )
                     .orderBy(desc(schema.coletasMetricas.coletadoEm))
                     .limit(1);
 
@@ -142,14 +168,16 @@ export class ServidoresService {
     }
 
     // Dashboard consolidado para tela inicial do frontend
-    async getDashboardData() {
-        const servidores = await this.listServidoresDoBanco();
+    async getDashboardData(janelaSegundos?: number) {
+        const janela = this.resolverJanelaSegundos(janelaSegundos);
+        const dataCorte = new Date(Date.now() - janela * 1000);
+        const servidores = await this.listServidoresDoBanco(janela);
 
         const disponiveis = servidores.filter((s) => s.status === 'disponivel').length;
         const indisponiveis = servidores.filter((s) => s.status === 'indisponivel').length;
         const removidos = servidores.filter((s) => s.status === 'removido').length;
 
-        // Soma total acumulada no banco e janela temporal das coletas
+        // Soma total acumulada na janela configurada e janela temporal das coletas
         const [totais] = await this.db
             .select({
                 consumoTotalKwh: sql<string | null>`sum(energia_kwh)::text`,
@@ -157,7 +185,8 @@ export class ServidoresService {
                 periodoInicio: sql<Date | null>`min(coletado_em)`,
                 periodoFim: sql<Date | null>`max(coletado_em)`,
             })
-            .from(schema.coletasMetricas);
+            .from(schema.coletasMetricas)
+            .where(gte(schema.coletasMetricas.coletadoEm, dataCorte));
 
         // Potência instantânea total dos servidores atualmente disponíveis com leitura válida
         const potenciaAtualWatts = servidores
@@ -182,6 +211,8 @@ export class ServidoresService {
                 cobertura_parcial: servidores.length > 0 && servidoresComMetricas < servidores.length,
                 periodo_inicio: totais?.periodoInicio ?? null,
                 periodo_fim: totais?.periodoFim ?? null,
+                janela_amostragem_segundos: janela,
+                intervalo_atualizacao_segundos: this.resolverJanelaSegundos(),
                 potencia_atual_watts: Number(potenciaAtualWatts.toFixed(2)),
                 consumo_total_acumulado_kwh: consumoTotal !== null ? Number(consumoTotal.toFixed(6)) : null,
                 emissoes_total_acumuladas_gco2e: emissoesTotal !== null ? Number(emissoesTotal.toFixed(4)) : null,
@@ -190,8 +221,10 @@ export class ServidoresService {
         };
     }
 
-    // Histórico de medições de um servidor para gráficos temporais
-    async getHistoricoServidor(idServidor: string, limite: number = 30) {
+    // Histórico de medições de um servidor para gráficos temporais dentro da janela de amostragem
+    async getHistoricoServidor(idServidor: string, limite: number = 30, janelaSegundos?: number) {
+        const janela = this.resolverJanelaSegundos(janelaSegundos);
+        const dataCorte = new Date(Date.now() - janela * 1000);
         // Valida se o servidor existe no banco
         const [servidor] = await this.db
             .select()
@@ -206,7 +239,12 @@ export class ServidoresService {
         const medicaoesDesc = await this.db
             .select()
             .from(schema.coletasMetricas)
-            .where(eq(schema.coletasMetricas.servidorId, idServidor))
+            .where(
+                and(
+                    eq(schema.coletasMetricas.servidorId, idServidor),
+                    gte(schema.coletasMetricas.coletadoEm, dataCorte),
+                ),
+            )
             .orderBy(desc(schema.coletasMetricas.coletadoEm))
             .limit(limite);
 
@@ -230,14 +268,16 @@ export class ServidoresService {
                 status: servidor.statusAtual,
                 codigo_regiao: servidor.codigoRegiao,
             },
+            janela_amostragem_segundos: janela,
             total_pontos: pontos.length,
             pontos,
         };
     }
 
     // Comparativo entre serviços selecionados (ou todos ativos)
-    async getComparativo(ids?: string[]) {
-        let servidores = await this.listServidoresDoBanco();
+    async getComparativo(ids?: string[], janelaSegundos?: number) {
+        const janela = this.resolverJanelaSegundos(janelaSegundos);
+        let servidores = await this.listServidoresDoBanco(janela);
 
         if (ids && ids.length > 0) {
             servidores = servidores.filter((s) => ids.includes(s.id));
@@ -260,6 +300,7 @@ export class ServidoresService {
         comparativo.sort((a, b) => compararNumerosComNulos(a.emissoes_gco2e, b.emissoes_gco2e, 'desc'));
 
         return {
+            janela_amostragem_segundos: janela,
             total_comparados: comparativo.length,
             servidores: comparativo,
         };
@@ -271,7 +312,11 @@ export class ServidoresService {
         ordem: 'desc' | 'asc' = 'desc',
         criterio: 'acumulado' | 'instantaneo' = 'acumulado',
         limite: number = 10,
+        janelaSegundos?: number,
     ) {
+        const janela = this.resolverJanelaSegundos(janelaSegundos);
+        const dataCorte = new Date(Date.now() - janela * 1000);
+
         if (criterio === 'acumulado') {
             // Agrega a soma histórica de emissões e energia acumuladas por servidor no banco
             const dadosAgregados = await this.db
@@ -291,6 +336,7 @@ export class ServidoresService {
                 .from(schema.coletasMetricas)
                 .innerJoin(schema.servidores, eq(schema.coletasMetricas.servidorId, schema.servidores.id))
                 .leftJoin(schema.regioes, eq(schema.servidores.codigoRegiao, schema.regioes.codigo))
+                .where(gte(schema.coletasMetricas.coletadoEm, dataCorte))
                 .groupBy(
                     schema.coletasMetricas.servidorId,
                     schema.servidores.nome,
@@ -335,12 +381,13 @@ export class ServidoresService {
                 criterio: 'acumulado',
                 ordenado_por: ordenarPor,
                 direcao: ordem,
+                janela_amostragem_segundos: janela,
                 total: ranking.length,
                 ranking: ranking.slice(0, limite),
             };
         } else {
-            // Critério instantâneo: usa a última medição registrada
-            const servidores = await this.listServidoresDoBanco();
+            // Critério instantâneo: usa a última medição registrada na janela
+            const servidores = await this.listServidoresDoBanco(janela);
             const ranking = servidores.map((s) => ({
                 posicao: 0,
                 id: s.id,
@@ -368,6 +415,7 @@ export class ServidoresService {
                 criterio: 'instantaneo',
                 ordenado_por: ordenarPor,
                 direcao: ordem,
+                janela_amostragem_segundos: janela,
                 total: ranking.length,
                 ranking: ranking.slice(0, limite),
             };
