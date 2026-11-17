@@ -7,8 +7,11 @@ export interface LocationData {
 }
 
 export interface MetricsData {
-  kwh: number;
-  gco2e: number;
+  kwh: number | null;
+  gco2e?: number | null;
+  kgco2e?: number | null;
+  periodo?: string;
+  estimado?: boolean;
 }
 
 export interface ServiceData {
@@ -17,4 +20,7 @@ export interface ServiceData {
   status: ServiceStatus;
   localizacao?: LocationData | null;
   valores: MetricsData;
+  periodo?: string;
+  estimado?: boolean;
+  ultimaAtualizacao?: string;
 }

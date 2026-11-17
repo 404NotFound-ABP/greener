@@ -1,13 +1,16 @@
 import React from 'react';
 import { useMap } from 'react-leaflet';
+import { formatEnvironmentalMetric } from '../utils/environmentalMetrics';
 
 export interface ModalServiceData {
   id: number | string;
   name: string;
   status: 'ativo' | 'indisponível' | 'sem_metricas' | string;
   location?: string | null;
-  kwh?: number;
-  co2?: number;
+  kwh?: number | null;
+  co2?: number | null;
+  period?: string;
+  isEstimated?: boolean;
   lastUpdate?: string;
 }
 
@@ -25,8 +28,10 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({ service }) => {
   const isIndisponivel = statusNorm === 'indisponível' || statusNorm === 'indisponivel';
   const isSemMetricas = statusNorm === 'sem_metricas' || statusNorm === 'sem métricas';
 
-  const kwhValue = service.kwh ?? 100;
-  const co2Value = service.co2 ?? 80;
+  const kwhMetric = formatEnvironmentalMetric(service.kwh, 'kWh');
+  const co2Metric = formatEnvironmentalMetric(service.co2, 'kgCO₂e');
+  const periodLabel =
+    service.period?.trim() || (isIndisponivel ? 'Última leitura registrada' : 'Últimos 7 dias');
   const locationLabel = service.location?.trim() || 'Não informada';
 
   return (
@@ -56,7 +61,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({ service }) => {
         </button>
       </div>
 
-      {/* 2. BADGE DE ESTADO + CIDADE (com fallback T23/US10) */}
+      {/* 2. BADGE DE ESTADO + CIDADE + ESTIMATIVA */}
       <div className="flex justify-start items-center gap-[8px] flex-wrap">
         {isAtivo && (
           <div className="px-[10px] py-[5px] bg-[#1F8A4C]/20 overflow-hidden rounded-[10px] border border-[#2FA862] flex justify-start items-center gap-[4px]">
@@ -105,27 +110,64 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({ service }) => {
             Cidade: {locationLabel}
           </span>
         </div>
+
+        {service.isEstimated && !isSemMetricas && (
+          <div
+            title="Valores calculados por estimativa ambiental"
+            className="px-[8px] py-[4px] bg-[#D97706]/20 rounded-[8px] border border-[#D97706] flex justify-start items-center gap-[4px]"
+          >
+            <svg className="w-[14px] h-[14px] text-[#FBBF24]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-[#FBBF24] text-[12px] sm:text-[13px] font-medium leading-[18px]">
+              Estimado
+            </span>
+          </div>
+        )}
       </div>
 
       {/* VARIAÇÃO 1: ATIVO */}
       {isAtivo && (
         <>
-          <div className="self-stretch grid grid-cols-2 gap-[10px] sm:gap-[12px]">
-            <div className="p-[10px] bg-transparent rounded-[10px] border border-[#2FA862] flex flex-col justify-start items-start gap-[4px]">
-              <div className="text-[#F2FAF5] text-[24px] sm:text-[34px] font-bold leading-[30px] sm:leading-[40px] whitespace-nowrap">
-                {kwhValue} kWh
-              </div>
-              <div className="text-[#12B76A] text-[11px] font-normal leading-[15px] flex items-center gap-[4px]">
-                <span className="text-[10px]">▲</span> 8% em relação à semana anterior
-              </div>
+          <div className="self-stretch flex flex-col gap-[6px]">
+            <div className="flex items-center justify-between text-[#A6DEBD] text-[12px] leading-[16px]">
+              <span>Indicadores ambientais</span>
+              <span>Período: {periodLabel}</span>
             </div>
 
-            <div className="p-[10px] bg-transparent rounded-[10px] border border-[#2FA862] flex flex-col justify-start items-start gap-[4px]">
-              <div className="text-[#F2FAF5] text-[24px] sm:text-[34px] font-bold leading-[30px] sm:leading-[40px] whitespace-nowrap">
-                {co2Value} kgCO₂e
+            <div className="self-stretch grid grid-cols-2 gap-[10px] sm:gap-[12px]">
+              <div className="p-[10px] bg-transparent rounded-[10px] border border-[#2FA862] flex flex-col justify-start items-start gap-[4px]">
+                {kwhMetric.isAvailable ? (
+                  <>
+                    <div className="text-[#F2FAF5] text-[22px] sm:text-[28px] font-bold leading-[28px] sm:leading-[34px] whitespace-nowrap">
+                      {kwhMetric.displayWithUnit}
+                    </div>
+                    <div className="text-[#A6DEBD] text-[11px] font-normal leading-[15px]">
+                      {periodLabel}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-[#DDF1E5]/70 text-[16px] sm:text-[18px] font-semibold leading-[26px]">
+                    Consumo indisponível
+                  </div>
+                )}
               </div>
-              <div className="text-[#12B76A] text-[11px] font-normal leading-[15px] flex items-center gap-[4px]">
-                <span className="text-[10px]">▲</span> 6% em relação à semana anterior
+
+              <div className="p-[10px] bg-transparent rounded-[10px] border border-[#2FA862] flex flex-col justify-start items-start gap-[4px]">
+                {co2Metric.isAvailable ? (
+                  <>
+                    <div className="text-[#F2FAF5] text-[22px] sm:text-[28px] font-bold leading-[28px] sm:leading-[34px] whitespace-nowrap">
+                      {co2Metric.displayWithUnit}
+                    </div>
+                    <div className="text-[#A6DEBD] text-[11px] font-normal leading-[15px]">
+                      {periodLabel}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-[#DDF1E5]/70 text-[16px] sm:text-[18px] font-semibold leading-[26px]">
+                    Emissão indisponível
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -163,7 +205,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({ service }) => {
           </div>
 
           <div className="text-[#A6DEBD] text-[12px] font-normal leading-[16px]">
-            Última atualização: {service.lastUpdate || '12:00'}
+            Última atualização: {service.lastUpdate || 'Aguardando sincronização'}
           </div>
 
           <button
@@ -183,24 +225,36 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({ service }) => {
               <span className="text-[#F7F7F5] text-[13px] font-bold leading-none">!</span>
             </div>
             <span className="text-[#F2FAF5] text-[13px] sm:text-[14px] font-normal leading-[20px]">
-              Sem conexão desde {service.lastUpdate || '10/10, 14:32'}
+              {service.lastUpdate ? `Sem conexão desde ${service.lastUpdate}` : 'Serviço sem conexão ativa'}
             </span>
           </div>
 
           <div className="self-stretch flex flex-col justify-center items-start gap-[10px]">
             <span className="text-[#A6DEBD] text-[12px] font-normal leading-[16px]">
-              Valores da última atualização
+              Valores da última atualização ({periodLabel})
             </span>
             <div className="self-stretch grid grid-cols-2 gap-[10px] sm:gap-[15px]">
-              <div className="p-[10px] bg-transparent rounded-[10px] border border-[#9C2A2A] flex flex-col justify-center items-center">
-                <span className="text-[#F2FAF5] text-[24px] sm:text-[36px] font-bold leading-[32px] sm:leading-[44px] whitespace-nowrap">
-                  {kwhValue} kWh
-                </span>
+              <div className="p-[10px] bg-transparent rounded-[10px] border border-[#9C2A2A] flex flex-col justify-center items-center text-center">
+                {kwhMetric.isAvailable ? (
+                  <span className="text-[#F2FAF5] text-[22px] sm:text-[28px] font-bold leading-[28px] sm:leading-[36px] whitespace-nowrap">
+                    {kwhMetric.displayWithUnit}
+                  </span>
+                ) : (
+                  <span className="text-[#F2FAF5]/75 text-[15px] sm:text-[16px] font-medium leading-[22px]">
+                    Consumo indisponível
+                  </span>
+                )}
               </div>
-              <div className="p-[10px] bg-transparent rounded-[10px] border border-[#9C2A2A] flex flex-col justify-center items-center">
-                <span className="text-[#F2FAF5] text-[24px] sm:text-[36px] font-bold leading-[32px] sm:leading-[44px] whitespace-nowrap">
-                  {co2Value} kgCO₂e
-                </span>
+              <div className="p-[10px] bg-transparent rounded-[10px] border border-[#9C2A2A] flex flex-col justify-center items-center text-center">
+                {co2Metric.isAvailable ? (
+                  <span className="text-[#F2FAF5] text-[22px] sm:text-[28px] font-bold leading-[28px] sm:leading-[36px] whitespace-nowrap">
+                    {co2Metric.displayWithUnit}
+                  </span>
+                ) : (
+                  <span className="text-[#F2FAF5]/75 text-[15px] sm:text-[16px] font-medium leading-[22px]">
+                    Emissão indisponível
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -238,7 +292,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({ service }) => {
           </div>
 
           <div className="text-[#A6DEBD] text-[12px] font-normal leading-[16px]">
-            Última atualização: {service.lastUpdate || '10/10, 14:32'}
+            Última atualização: {service.lastUpdate || 'Indisponível'}
           </div>
 
           <button
@@ -273,7 +327,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({ service }) => {
                 Este serviço ainda não envia dados
               </span>
               <span className="text-[#DDF1E5]/80 sm:text-[#3A4940] text-[12px] font-normal leading-[16px]">
-                Verifique o sensor ou veja os detalhes no dashboard.
+                Resultados ambientais indisponíveis no momento.
               </span>
             </div>
           </div>
