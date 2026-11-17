@@ -24,34 +24,31 @@ export const Register: React.FC<RegisterProps> = ({ onNextStep }) => {
   };
 
   return (
-    <div className="relative min-h-screen w-full bg-[#07150E] overflow-hidden flex items-center justify-center px-4 sm:px-8 py-12 font-sans select-none">
+    <div className="relative min-h-screen w-full bg-[#07150E] overflow-hidden flex items-center justify-center px-4 py-6 font-sans select-none">
       
-      {/* Fundo com Órbitas */}
-      <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-0 pointer-events-none opacity-60 xl:opacity-100 flex items-center justify-center">
-        <div className="w-[1440px] h-[1024px] scale-[0.35] sm:scale-[0.50] md:scale-[0.60] lg:scale-[0.75] xl:scale-[0.90] 2xl:scale-100 origin-center transition-transform duration-500">
+      {/* Container do Conjunto (Órbitas + Logo + Card) com a mesma escala do Login */}
+      <div className="relative w-full max-w-[600px] mt-[120px] mb-[20px] scale-[0.72] sm:scale-[0.78] lg:scale-[0.82] xl:scale-[0.84] 2xl:scale-[0.88] origin-center transition-transform duration-300">
+        
+        {/* 1. ÓRBITAS: Ancoradas a -241px do topo do Card */}
+        <div className="absolute left-1/2 -translate-x-1/2 -top-[241px] w-[1440px] h-[1024px] pointer-events-none z-0">
           <OrbitsBackground />
         </div>
-      </div>
 
-      {/* Container Principal do Card Responsivo */}
-      <div className="relative w-full max-w-[600px] z-10 mt-[80px] sm:mt-[120px]">
-        
-        {/* Globo e Logo */}
-        <div className="absolute left-1/2 -translate-x-1/2 -top-[50px] sm:-top-[70px] md:-top-[90px] lg:-top-[125px] z-20">
+        {/* 2. GLOBO E LOGO: Ancorados a -103px do topo do Card */}
+        <div className="absolute left-1/2 -translate-x-1/2 -top-[103px] z-20">
           <GreenerGlobeLogo />
         </div>
 
-        {/* Card de Cadastro */}
+        {/* 3. CARD DE CADASTRO */}
         <form
-        onSubmit={handleSubmit}
-        className="w-full pt-[165px] pb-[32px] px-[30px] bg-[rgba(242,250,245,0.12)] shadow-[0px_24px_48px_rgba(21,32,26,0.25),inset_0px_4px_4px_rgba(242,250,245,0.10)] rounded-[24px] border-t-[1px] border-r-[2px] border-b-[2px] border-l-0 border-[rgba(242,250,245,0.50)] backdrop-blur-[8px] flex flex-col gap-[24px]"
-      >
+          onSubmit={handleSubmit}
+          className="relative z-10 w-full pt-[165px] pb-[32px] px-[30px] bg-[rgba(242,250,245,0.12)] shadow-[0px_24px_48px_rgba(21,32,26,0.25),inset_0px_4px_4px_rgba(242,250,245,0.10)] rounded-[24px] border-t-[1px] border-r-[2px] border-b-[2px] border-l-0 border-[rgba(242,250,245,0.50)] backdrop-blur-[8px] flex flex-col gap-[24px]"
+        >
           {/* Cabeçalho */}
           <div className="w-full flex flex-col gap-2 text-center">
             <h1 className="text-[#F2FAF5] text-[24px] sm:text-[32px] font-bold leading-tight">
               Vamos começar seu cadastro!
             </h1>
-            {/* Nota: Corrigi o "adicone" do design original para "adicione" */}
             <p className="text-[#F2FAF5] text-[16px] sm:text-[20px] font-medium leading-relaxed">
               Por favor adicione seus dados nos campos abaixo:
             </p>
