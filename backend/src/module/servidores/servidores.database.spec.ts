@@ -445,5 +445,41 @@ describe('ServidoresService — consultas do banco', () => {
       expect(resultado.ranking[1]?.emissoes_total_gco2e).toBeNull();
       expect(resultado.ranking[1]?.energia_total_kwh).toBeNull();
     });
+
+    it('RF13: retorna coordenadas da região quando disponíveis e null quando ausentes', async () => {
+      // Arrange
+      const comCoordenadas = {
+        ...servidor('a'),
+        regiao: {
+          ...servidor('a').regiao,
+          latitude: '-23.55',
+          longitude: '-46.63',
+        },
+      };
+      const semCoordenadas = {
+        ...servidor('b'),
+        regiao: {
+          ...servidor('b').regiao,
+          latitude: null,
+          longitude: null,
+        },
+      };
+      contexto.fila.push([comCoordenadas, semCoordenadas], [], []);
+
+      // Act
+      const resultado = await contexto.service.listServidoresDoBanco();
+
+      // Assert
+      expect(resultado[0]).toMatchObject({
+        id: 'a',
+        nome: 'Serviço a',
+        regiao: { codigo: 'br-sudeste', latitude: -23.55, longitude: -46.63 },
+      });
+      expect(resultado[1]).toMatchObject({
+        id: 'b',
+        nome: 'Serviço b',
+        regiao: { codigo: 'br-sudeste', latitude: null, longitude: null },
+      });
+    });
   });
 });

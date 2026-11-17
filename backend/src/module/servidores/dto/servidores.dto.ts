@@ -13,6 +13,12 @@ export class RegiaoServidorDto {
   @ApiProperty({ example: 'Sao Paulo', nullable: true })
   cidade!: string | null;
 
+  @ApiProperty({ example: -23.5505, nullable: true })
+  latitude!: number | null;
+
+  @ApiProperty({ example: -46.6333, nullable: true })
+  longitude!: number | null;
+
   @ApiProperty({ example: 85, nullable: true })
   carbon_intensity_gco2e_kwh!: number | null;
 
