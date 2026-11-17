@@ -13,11 +13,11 @@ export class RegiaoServidorDto {
   @ApiProperty({ example: 'Sao Paulo', nullable: true })
   cidade!: string | null;
 
-  @ApiProperty({ example: 85 })
-  carbon_intensity_gco2e_kwh!: number;
+  @ApiProperty({ example: 85, nullable: true })
+  carbon_intensity_gco2e_kwh!: number | null;
 
-  @ApiProperty({ example: 83 })
-  renewable_share_percent!: number;
+  @ApiProperty({ example: 83, nullable: true })
+  renewable_share_percent!: number | null;
 }
 
 export class UltimaColetaServidorDto {
@@ -27,26 +27,26 @@ export class UltimaColetaServidorDto {
   @ApiProperty({ example: 'disponivel', enum: ['disponivel', 'indisponivel', 'removido'], required: false })
   status?: string;
 
-  @ApiProperty({ example: 87.61 })
-  potencia_watts!: number;
+  @ApiProperty({ example: 87.61, nullable: true })
+  potencia_watts!: number | null;
 
-  @ApiProperty({ example: 0.000292 })
-  energia_kwh!: number;
+  @ApiProperty({ example: 0.000292, nullable: true })
+  energia_kwh!: number | null;
 
-  @ApiProperty({ example: 0.1104 })
-  emissoes_gco2e!: number;
+  @ApiProperty({ example: 0.1104, nullable: true })
+  emissoes_gco2e!: number | null;
 
-  @ApiProperty({ example: 85.7 })
-  cpu_percent!: number;
+  @ApiProperty({ example: 85.7, nullable: true })
+  cpu_percent!: number | null;
 
-  @ApiProperty({ example: 4.31 })
-  memoria_gb!: number;
+  @ApiProperty({ example: 4.31, nullable: true })
+  memoria_gb!: number | null;
 
-  @ApiProperty({ example: 27.0 })
-  disco_gb!: number;
+  @ApiProperty({ example: 27.0, nullable: true })
+  disco_gb!: number | null;
 
-  @ApiProperty({ example: 1.22 })
-  rede_gb!: number;
+  @ApiProperty({ example: 1.22, nullable: true })
+  rede_gb!: number | null;
 }
 
 export class ServidorComRegiaoDto {
@@ -85,14 +85,29 @@ export class ResumoDashboardDto {
   @ApiProperty({ example: 1 })
   removidos!: number;
 
+  @ApiProperty({ example: 7 })
+  servidores_com_metricas!: number;
+
+  @ApiProperty({ example: 1 })
+  servidores_sem_metricas!: number;
+
+  @ApiProperty({ example: true })
+  cobertura_parcial!: boolean;
+
+  @ApiProperty({ example: '2026-10-25T18:00:00.000Z', nullable: true })
+  periodo_inicio!: Date | null;
+
+  @ApiProperty({ example: '2026-10-25T20:47:18.311Z', nullable: true })
+  periodo_fim!: Date | null;
+
   @ApiProperty({ example: 485.2, description: 'Soma da potência instantânea de todos os servidores ativos em Watts' })
   potencia_atual_watts!: number;
 
-  @ApiProperty({ example: 0.45892, description: 'Consumo total de energia acumulado no histórico em kWh' })
-  consumo_total_acumulado_kwh!: number;
+  @ApiProperty({ example: 0.45892, description: 'Consumo total de energia acumulado no histórico em kWh', nullable: true })
+  consumo_total_acumulado_kwh!: number | null;
 
-  @ApiProperty({ example: 124.53, description: 'Emissões totais acumuladas no histórico em gCO2e' })
-  emissoes_total_acumuladas_gco2e!: number;
+  @ApiProperty({ example: 124.53, description: 'Emissões totais acumuladas no histórico em gCO2e', nullable: true })
+  emissoes_total_acumuladas_gco2e!: number | null;
 }
 
 export class DashboardResponseDto {
@@ -119,35 +134,35 @@ export class RankingItemDto {
   @ApiProperty({ example: 'United States' })
   regiao!: string;
 
-  @ApiProperty({ example: 378 })
-  intensidade_carbono!: number;
+  @ApiProperty({ example: 378, nullable: true })
+  intensidade_carbono!: number | null;
 
   @ApiProperty({ example: 144, required: false })
   total_coletas?: number;
 
-  @ApiProperty({ example: 0.100686, description: 'Energia em kWh (acumulada ou instantânea)' })
-  energia_total_kwh?: number;
+  @ApiProperty({ example: 0.100686, description: 'Energia em kWh (acumulada ou instantânea)', nullable: true })
+  energia_total_kwh?: number | null;
 
-  @ApiProperty({ example: 38.0594, description: 'Emissões em gCO2e (acumuladas ou instantâneas)' })
-  emissoes_total_gco2e?: number;
+  @ApiProperty({ example: 38.0594, description: 'Emissões em gCO2e (acumuladas ou instantâneas)', nullable: true })
+  emissoes_total_gco2e?: number | null;
 
-  @ApiProperty({ example: 77.39, description: 'Potência média em Watts' })
-  potencia_media_watts?: number;
+  @ApiProperty({ example: 77.39, description: 'Potência média em Watts', nullable: true })
+  potencia_media_watts?: number | null;
 
-  @ApiProperty({ example: 75.39, description: 'CPU média em %' })
-  cpu_media_percent?: number;
+  @ApiProperty({ example: 75.39, description: 'CPU média em %', nullable: true })
+  cpu_media_percent?: number | null;
 
-  @ApiProperty({ example: 87.61, required: false })
-  potencia_watts?: number;
+  @ApiProperty({ example: 87.61, required: false, nullable: true })
+  potencia_watts?: number | null;
 
-  @ApiProperty({ example: 0.000292, required: false })
-  energia_kwh?: number;
+  @ApiProperty({ example: 0.000292, required: false, nullable: true })
+  energia_kwh?: number | null;
 
-  @ApiProperty({ example: 0.1104, required: false })
-  emissoes_gco2e?: number;
+  @ApiProperty({ example: 0.1104, required: false, nullable: true })
+  emissoes_gco2e?: number | null;
 
-  @ApiProperty({ example: 85.7, required: false })
-  cpu_percent?: number;
+  @ApiProperty({ example: 85.7, required: false, nullable: true })
+  cpu_percent?: number | null;
 }
 
 export class RankingResponseDto {
@@ -180,23 +195,23 @@ export class ComparativoItemDto {
   @ApiProperty({ example: 'United States' })
   regiao!: string;
 
-  @ApiProperty({ example: 378 })
-  intensidade_carbono_regional!: number;
+  @ApiProperty({ example: 378, nullable: true })
+  intensidade_carbono_regional!: number | null;
 
-  @ApiProperty({ example: 87.61 })
-  potencia_watts!: number;
+  @ApiProperty({ example: 87.61, nullable: true })
+  potencia_watts!: number | null;
 
-  @ApiProperty({ example: 0.000292 })
-  energia_kwh!: number;
+  @ApiProperty({ example: 0.000292, nullable: true })
+  energia_kwh!: number | null;
 
-  @ApiProperty({ example: 0.1104 })
-  emissoes_gco2e!: number;
+  @ApiProperty({ example: 0.1104, nullable: true })
+  emissoes_gco2e!: number | null;
 
-  @ApiProperty({ example: 85.7 })
-  cpu_percent!: number;
+  @ApiProperty({ example: 85.7, nullable: true })
+  cpu_percent!: number | null;
 
-  @ApiProperty({ example: 4.31 })
-  memoria_gb!: number;
+  @ApiProperty({ example: 4.31, nullable: true })
+  memoria_gb!: number | null;
 }
 
 export class ComparativoResponseDto {
@@ -214,26 +229,26 @@ export class PontoHistoricoDto {
   @ApiProperty({ example: 'disponivel' })
   status!: string;
 
-  @ApiProperty({ example: 87.61 })
-  potencia_watts!: number;
+  @ApiProperty({ example: 87.61, nullable: true })
+  potencia_watts!: number | null;
 
-  @ApiProperty({ example: 0.000292 })
-  energia_kwh!: number;
+  @ApiProperty({ example: 0.000292, nullable: true })
+  energia_kwh!: number | null;
 
-  @ApiProperty({ example: 0.1104 })
-  emissoes_gco2e!: number;
+  @ApiProperty({ example: 0.1104, nullable: true })
+  emissoes_gco2e!: number | null;
 
-  @ApiProperty({ example: 85.7 })
-  cpu_percent!: number;
+  @ApiProperty({ example: 85.7, nullable: true })
+  cpu_percent!: number | null;
 
-  @ApiProperty({ example: 4.31 })
-  memoria_gb!: number;
+  @ApiProperty({ example: 4.31, nullable: true })
+  memoria_gb!: number | null;
 
-  @ApiProperty({ example: 27.0 })
-  disco_gb!: number;
+  @ApiProperty({ example: 27.0, nullable: true })
+  disco_gb!: number | null;
 
-  @ApiProperty({ example: 1.22 })
-  rede_gb!: number;
+  @ApiProperty({ example: 1.22, nullable: true })
+  rede_gb!: number | null;
 }
 
 export class HistoricoServidorResponseDto {

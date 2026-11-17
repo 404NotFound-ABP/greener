@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { Logger } from '@nestjs/common';
+import { Logger, ServiceUnavailableException } from '@nestjs/common';
 import { config } from '@/config/config';
 import type { DrizzleDB } from '@/database';
 import * as schema from '@/database/schema';
@@ -24,6 +24,7 @@ jest.unstable_mockModule('@/database', () => ({
 }));
 
 const { CollectorService } = await import('./collector.service');
+const { CollectorController } = await import('./collector.controller');
 
 function criarServidor(id: string): ServidorResponse {
   return {
@@ -404,5 +405,23 @@ describe('CollectorService', () => {
     expect(segunda).toMatchObject({ status: 'em_andamento' });
     expect(resultadoPrimeira).toMatchObject({ status: 'sucesso' });
     expect(regioes).toHaveBeenCalledTimes(1);
+  });
+
+  it('M03: retorna status erro na coleta manual e HTTP 503 no controller quando a descoberta falha', async () => {
+    // Arrange
+    const { service, listar } = prepararColetor();
+    listar.mockRejectedValue(new Error('Serviço de métricas indisponível (503)'));
+    const controller = new CollectorController(service);
+
+    // Act
+    const resultadoManual = await service.executarColetaManual();
+    const erroController = await controller.dispararColeta().catch((err: unknown) => err);
+
+    // Assert
+    expect(resultadoManual).toMatchObject({
+      status: 'erro',
+      detalhes: { servidoresProcessados: 0, erro: 'Serviço de métricas indisponível (503)' },
+    });
+    expect(erroController).toBeInstanceOf(ServiceUnavailableException);
   });
 });

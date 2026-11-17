@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Query } from '@nestjs/common';
+import { Controller, Get, Post, Query, ServiceUnavailableException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { CollectorService } from './collector.service';
 import {
@@ -15,8 +15,13 @@ export class CollectorController {
   @Post('executar')
   @ApiOperation({ summary: 'Dispara manualmente um ciclo de coleta e persiste no banco' })
   @ApiResponse({ status: 200, description: 'Ciclo de coleta finalizado', type: ColetaExecucaoResultadoDto })
+  @ApiResponse({ status: 503, description: 'Falha ao executar ciclo de coleta', type: ColetaExecucaoResultadoDto })
   async dispararColeta(): Promise<ColetaExecucaoResultadoDto> {
-    return this.collectorService.executarColetaManual();
+    const resultado = await this.collectorService.executarColetaManual();
+    if (resultado.status === 'erro') {
+      throw new ServiceUnavailableException(resultado);
+    }
+    return resultado;
   }
 
   @Get('status')
