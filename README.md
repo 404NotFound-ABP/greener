@@ -18,38 +18,15 @@ Use um ambiente local de demonstração com Docker e Compose v2 ou posterior, co
 
 1. Na primeira execução, copie [`.env-example`](.env-example) para `.env` e preencha `DB_PASSWORD` com uma senha local. Para reproduzir as portas abaixo, mantenha os demais valores de banco e portas do exemplo. Em PowerShell, a cópia pode ser feita com `Copy-Item .env-example .env`. Em Linux/macOS, use `cp .env-example .env`.
 
-2. Valide o Compose, construa as imagens e aguarde o PostgreSQL ficar saudável.
+2. Valide o Compose e inicie a stack completa. As imagens serão construídas, o PostgreSQL aguardará o healthcheck e o backend executará as migrações automaticamente antes de iniciar a API:
 
    ```sh
    docker compose config --quiet
-   docker compose build
-   docker compose up -d --wait postgres
-   ```
-
-3. Aplique as migrações versionadas. O comando usa o migrador do Drizzle incluído na imagem do backend e as credenciais que o Compose fornece ao container. Execute esta etapa em um banco novo ou quando houver novas migrações. Prossiga após o comando terminar com código zero.
-
-   ```sh
-   docker compose run --rm --no-deps backend node -e "
-   const { Pool } = require('pg');
-   const { drizzle } = require('drizzle-orm/node-postgres');
-   const { migrate } = require('drizzle-orm/node-postgres/migrator');
-   const { DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME } = process.env;
-   const pool = new Pool({
-     host: DB_HOST, port: Number(DB_PORT), user: DB_USER,
-     password: DB_PASSWORD, database: DB_NAME
-   });
-   migrate(drizzle(pool), { migrationsFolder: './drizzle' })
-     .catch(error => { console.error(error); process.exitCode = 1; })
-     .finally(() => pool.end());
-   "
-   ```
-
-4. Inicie as aplicações e confira o estado dos três serviços.
-
-   ```sh
-   docker compose up -d
+   docker compose up -d --build
    docker compose ps
    ```
+
+   > **Migrações automáticas:** O container do backend executa automaticamente o script de migração (`node migrate.js`) garantindo que todas as tabelas sejam criadas em um banco novo antes da API entrar no ar. Caso queira aplicar ou verificar migrações manualmente de forma isolada, use: `docker compose run --rm --no-deps backend node migrate.js`.
 
 | Acesso local com o `.env` de exemplo | Resultado esperado |
 |---|---|
