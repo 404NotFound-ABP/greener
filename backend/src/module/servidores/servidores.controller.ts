@@ -46,6 +46,8 @@ export class ServidoresController {
     @ApiQuery({ name: 'criterio', required: false, enum: ['acumulado', 'instantaneo'], description: 'Critério: acumulado histórico ou instantâneo última coleta (padrão: acumulado)' })
     @ApiQuery({ name: 'limite', required: false, description: 'Quantidade máxima no ranking (padrão: 10)' })
     @ApiQuery({ name: 'janelaSegundos', required: false, description: 'Janela de amostragem em segundos (300, 900, 1800, 3600, 86400, 2592000). Padrão: configurado no sistema' })
+    @ApiQuery({ name: 'dataInicial', required: false, description: 'Data/hora inicial em ISO 8601 (ex: 2026-11-16T00:00:00Z)' })
+    @ApiQuery({ name: 'dataFinal', required: false, description: 'Data/hora final em ISO 8601 (ex: 2026-11-16T23:59:59Z)' })
     @ApiResponse({ status: 200, description: 'Ranking de servidores ordenado', type: RankingResponseDto })
     async getRanking(
         @Query('ordenarPor') ordenarPor?: 'emissoes' | 'energia',
@@ -53,6 +55,8 @@ export class ServidoresController {
         @Query('criterio') criterio?: 'acumulado' | 'instantaneo',
         @Query('limite') limite?: string,
         @Query('janelaSegundos') janelaSegundos?: string,
+        @Query('dataInicial') dataInicial?: string,
+        @Query('dataFinal') dataFinal?: string,
     ): Promise<RankingResponseDto> {
         const janela = janelaSegundos !== undefined ? Number(janelaSegundos) : undefined;
         return this.servidoresService.getRankingServidores(
@@ -61,6 +65,8 @@ export class ServidoresController {
             criterio,
             Number(limite) || 10,
             janela,
+            dataInicial,
+            dataFinal,
         );
     }
 

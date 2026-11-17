@@ -592,5 +592,48 @@ describe('ServidoresService — consultas do banco', () => {
       expect(resultado.servidores[0]).toMatchObject({ disco_gb: 20, rede_gb: 1.5 });
       expect(resultado.servidores[1]).toMatchObject({ disco_gb: null, rede_gb: null, emissoes_gco2e: null });
     });
+
+    it('RF14 (#128): informa periodo no ranking e aplica desempate determinístico por nome e id', async () => {
+      // Arrange — empatados no indicador principal e fora de ordem alfabética
+      contexto.fila.push([
+        {
+          servidorId: 'id-2', nome: 'Beta', statusAtual: 'disponivel', codigoRegiao: 'br',
+          paisRegiao: 'Brasil', intensidadeCarbono: '400', totalColetas: 2,
+          totalEnergiaKwh: '2', totalEmissoesGco2e: '10', potenciaMediaWatts: '40', cpuMediaPercent: '40',
+        },
+        {
+          servidorId: 'id-1', nome: 'Alpha', statusAtual: 'disponivel', codigoRegiao: 'br',
+          paisRegiao: 'Brasil', intensidadeCarbono: '400', totalColetas: 2,
+          totalEnergiaKwh: '2', totalEmissoesGco2e: '10', potenciaMediaWatts: '40', cpuMediaPercent: '40',
+        },
+        {
+          servidorId: 'id-3', nome: 'Alpha', statusAtual: 'disponivel', codigoRegiao: 'br',
+          paisRegiao: 'Brasil', intensidadeCarbono: '400', totalColetas: 2,
+          totalEnergiaKwh: '2', totalEmissoesGco2e: '10', potenciaMediaWatts: '40', cpuMediaPercent: '40',
+        },
+      ]);
+
+      // Act
+      const resultado = await contexto.service.getRankingServidores(
+        'emissoes',
+        'desc',
+        'acumulado',
+        10,
+        undefined,
+        '2026-11-16T00:00:00Z',
+        '2026-11-16T23:59:59Z',
+      );
+
+      // Assert
+      expect(resultado.periodo).toEqual({
+        inicio: new Date('2026-11-16T00:00:00Z'),
+        fim: new Date('2026-11-16T23:59:59Z'),
+      });
+      expect(resultado.ranking.map((r) => `${r.nome}:${r.id}`)).toEqual([
+        'Alpha:id-1',
+        'Alpha:id-3',
+        'Beta:id-2',
+      ]);
+    });
   });
 });

@@ -25,6 +25,20 @@ function compararNumerosComNulos(a: number | null, b: number | null, ordem: 'asc
     return ordem === 'desc' ? b - a : a - b;
 }
 
+function compararRankingComDesempate(
+    valorA: number | null,
+    valorB: number | null,
+    ordem: 'asc' | 'desc',
+    a: { nome: string; id: string },
+    b: { nome: string; id: string },
+): number {
+    const cmpValor = compararNumerosComNulos(valorA, valorB, ordem);
+    if (cmpValor !== 0) return cmpValor;
+    const cmpNome = a.nome.localeCompare(b.nome);
+    if (cmpNome !== 0) return cmpNome;
+    return a.id.localeCompare(b.id);
+}
+
 @Injectable()
 export class ServidoresService {
     constructor(
@@ -365,13 +379,35 @@ export class ServidoresService {
         criterio: 'acumulado' | 'instantaneo' = 'acumulado',
         limite: number = 10,
         janelaSegundos?: number,
+        dataInicial?: string,
+        dataFinal?: string,
     ) {
+        const inicioInformado = this.parseDataParametro(dataInicial, 'dataInicial');
+        const fimInformado = this.parseDataParametro(dataFinal, 'dataFinal');
+
+        if (inicioInformado && fimInformado && inicioInformado > fimInformado) {
+            throw new BadRequestException('dataInicial não pode ser posterior a dataFinal.');
+        }
+
         const janela = this.resolverJanelaSegundos(janelaSegundos);
-        const dataCorte = new Date(Date.now() - janela * 1000);
+        const agora = new Date();
+        const usarPeriodoExplicito = Boolean(inicioInformado || fimInformado);
+        const inicioEfetivo = usarPeriodoExplicito
+            ? (inicioInformado ?? null)
+            : new Date(agora.getTime() - janela * 1000);
+        const fimEfetivo = usarPeriodoExplicito ? (fimInformado ?? null) : agora;
 
         if (criterio === 'acumulado') {
+            const condicoes: ReturnType<typeof gte>[] = [];
+            if (inicioEfetivo) {
+                condicoes.push(gte(schema.coletasMetricas.coletadoEm, inicioEfetivo));
+            }
+            if (fimEfetivo) {
+                condicoes.push(lte(schema.coletasMetricas.coletadoEm, fimEfetivo));
+            }
+
             // Agrega a soma histórica de emissões e energia acumuladas por servidor no banco
-            const dadosAgregados = await this.db
+            const consulta = this.db
                 .select({
                     servidorId: schema.coletasMetricas.servidorId,
                     nome: schema.servidores.nome,
@@ -387,8 +423,9 @@ export class ServidoresService {
                 })
                 .from(schema.coletasMetricas)
                 .innerJoin(schema.servidores, eq(schema.coletasMetricas.servidorId, schema.servidores.id))
-                .leftJoin(schema.regioes, eq(schema.servidores.codigoRegiao, schema.regioes.codigo))
-                .where(gte(schema.coletasMetricas.coletadoEm, dataCorte))
+                .leftJoin(schema.regioes, eq(schema.servidores.codigoRegiao, schema.regioes.codigo));
+
+            const dadosAgregados = await (condicoes.length > 0 ? consulta.where(and(...condicoes)) : consulta)
                 .groupBy(
                     schema.coletasMetricas.servidorId,
                     schema.servidores.nome,
@@ -422,7 +459,7 @@ export class ServidoresService {
             ranking.sort((a, b) => {
                 const valorA = ordenarPor === 'emissoes' ? a.emissoes_total_gco2e : a.energia_total_kwh;
                 const valorB = ordenarPor === 'emissoes' ? b.emissoes_total_gco2e : b.energia_total_kwh;
-                return compararNumerosComNulos(valorA, valorB, ordem);
+                return compararRankingComDesempate(valorA, valorB, ordem, a, b);
             });
 
             ranking.forEach((item, idx) => {
@@ -434,6 +471,10 @@ export class ServidoresService {
                 ordenado_por: ordenarPor,
                 direcao: ordem,
                 janela_amostragem_segundos: janela,
+                periodo: {
+                    inicio: inicioEfetivo,
+                    fim: fimEfetivo,
+                },
                 total: ranking.length,
                 ranking: ranking.slice(0, limite),
             };
@@ -456,7 +497,7 @@ export class ServidoresService {
             ranking.sort((a, b) => {
                 const valorA = ordenarPor === 'emissoes' ? a.emissoes_gco2e : a.energia_kwh;
                 const valorB = ordenarPor === 'emissoes' ? b.emissoes_gco2e : b.energia_kwh;
-                return compararNumerosComNulos(valorA, valorB, ordem);
+                return compararRankingComDesempate(valorA, valorB, ordem, a, b);
             });
 
             ranking.forEach((item, idx) => {
@@ -468,6 +509,10 @@ export class ServidoresService {
                 ordenado_por: ordenarPor,
                 direcao: ordem,
                 janela_amostragem_segundos: janela,
+                periodo: {
+                    inicio: inicioEfetivo,
+                    fim: fimEfetivo,
+                },
                 total: ranking.length,
                 ranking: ranking.slice(0, limite),
             };

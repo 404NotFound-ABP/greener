@@ -190,6 +190,15 @@ export class RankingResponseDto {
   @ApiProperty({ example: 300, description: 'Janela de amostragem aplicada em segundos' })
   janela_amostragem_segundos!: number;
 
+  @ApiProperty({
+    example: { inicio: '2026-11-16T23:55:00.000Z', fim: '2026-11-17T00:00:00.000Z' },
+    description: 'Período utilizado para calcular o ranking',
+  })
+  periodo!: {
+    inicio: Date | null;
+    fim: Date | null;
+  };
+
   @ApiProperty({ example: 8 })
   total!: number;
 
