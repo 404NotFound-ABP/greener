@@ -321,4 +321,129 @@ describe('ServidoresService — consultas do banco', () => {
       await expect(resultado).rejects.toBe(erro);
     },
   );
+
+  describe('Regressões do Bloco 2 — ausência não é zero e cobertura do dashboard', () => {
+    it('M01: preserva campos nulos na última coleta em listServidoresDoBanco', async () => {
+      // Arrange
+      contexto.fila.push(
+        [servidor('a', 'sem_metricas')],
+        [{
+          status: 'sem_metricas', potenciaWatts: null, energiaKwh: null, emissoesGco2e: null,
+          cpuPercent: null, memoriaGb: null, discoGb: null, redeGb: null,
+          coletadoEm: new Date('2026-11-12T12:00:00Z'),
+        }],
+      );
+
+      // Act
+      const [item] = await contexto.service.listServidoresDoBanco();
+
+      // Assert
+      expect(item?.ultima_coleta).toMatchObject({
+        potencia_watts: null,
+        energia_kwh: null,
+        emissoes_gco2e: null,
+        cpu_percent: null,
+        memoria_gb: null,
+        disco_gb: null,
+        rede_gb: null,
+      });
+    });
+
+    it('M02: preserva indicadores e métricas nulos em getHistoricoServidor', async () => {
+      // Arrange
+      contexto.fila.push(
+        [servidor('a')],
+        [{
+          status: 'sem_metricas', potenciaWatts: null, energiaKwh: null, emissoesGco2e: null,
+          cpuPercent: null, memoriaGb: null, discoGb: null, redeGb: null,
+          coletadoEm: new Date('2026-11-12T12:00:00Z'),
+        }],
+      );
+
+      // Act
+      const historico = await contexto.service.getHistoricoServidor('a');
+
+      // Assert
+      expect(historico.pontos[0]).toMatchObject({
+        potencia_watts: null,
+        energia_kwh: null,
+        emissoes_gco2e: null,
+        cpu_percent: null,
+      });
+    });
+
+    it('M04: informa cobertura parcial e janela temporal no resumo do dashboard', async () => {
+      // Arrange
+      const inicio = new Date('2026-11-12T10:00:00Z');
+      const fim = new Date('2026-11-12T12:00:00Z');
+      const itens = [
+        { id: 'a', status: 'disponivel', ultima_coleta: { potencia_watts: 40 } },
+        { id: 'b', status: 'sem_metricas', ultima_coleta: { potencia_watts: null } },
+      ] as Awaited<ReturnType<typeof contexto.service.listServidoresDoBanco>>;
+      jest.spyOn(contexto.service, 'listServidoresDoBanco').mockResolvedValue(itens);
+      contexto.fila.push([{
+        consumoTotalKwh: null, emissoesTotalGco2e: null,
+        periodoInicio: inicio, periodoFim: fim,
+      }]);
+
+      // Act
+      const resultado = await contexto.service.getDashboardData();
+
+      // Assert
+      expect(resultado.resumo).toMatchObject({
+        total_servidores: 2,
+        servidores_com_metricas: 1,
+        servidores_sem_metricas: 1,
+        cobertura_parcial: true,
+        periodo_inicio: inicio,
+        periodo_fim: fim,
+        consumo_total_acumulado_kwh: null,
+        emissoes_total_acumuladas_gco2e: null,
+      });
+    });
+
+    it('M05: preserva nulos e mantém itens sem leitura no fim do comparativo e ranking', async () => {
+      // Arrange
+      const itens = [
+        { id: 'sem-dados', nome: 'Sem Dados', status: 'sem_metricas', regiao: null, ultima_coleta: null },
+        { id: 'a', nome: 'A', status: 'disponivel', regiao: null, ultima_coleta: { emissoes_gco2e: 5, energia_kwh: 1 } },
+        { id: 'b', nome: 'B', status: 'disponivel', regiao: null, ultima_coleta: { emissoes_gco2e: 10, energia_kwh: 2 } },
+      ] as Awaited<ReturnType<typeof contexto.service.listServidoresDoBanco>>;
+      jest.spyOn(contexto.service, 'listServidoresDoBanco').mockResolvedValue(itens);
+
+      // Act
+      const comparativo = await contexto.service.getComparativo();
+      const rankingAsc = await contexto.service.getRankingServidores('emissoes', 'asc', 'instantaneo', 10);
+
+      // Assert
+      expect(comparativo.servidores.map((s) => s.id)).toEqual(['b', 'a', 'sem-dados']);
+      expect(comparativo.servidores[2]?.emissoes_gco2e).toBeNull();
+      expect(rankingAsc.ranking.map((r) => r.id)).toEqual(['a', 'b', 'sem-dados']);
+      expect(rankingAsc.ranking[2]?.emissoes_gco2e).toBeNull();
+    });
+
+    it('M05: preserva nulos no ranking acumulado quando agregação SQL retorna null', async () => {
+      // Arrange
+      contexto.fila.push([
+        {
+          servidorId: 'sem-dados', nome: 'Sem Dados', statusAtual: 'sem_metricas', codigoRegiao: 'br',
+          paisRegiao: 'Brasil', intensidadeCarbono: '400', totalColetas: 1,
+          totalEnergiaKwh: null, totalEmissoesGco2e: null, potenciaMediaWatts: null, cpuMediaPercent: null,
+        },
+        {
+          servidorId: 'a', nome: 'A', statusAtual: 'disponivel', codigoRegiao: 'br',
+          paisRegiao: 'Brasil', intensidadeCarbono: '400', totalColetas: 1,
+          totalEnergiaKwh: '1', totalEmissoesGco2e: '10', potenciaMediaWatts: '40', cpuMediaPercent: '40',
+        },
+      ]);
+
+      // Act
+      const resultado = await contexto.service.getRankingServidores('emissoes', 'asc', 'acumulado', 10);
+
+      // Assert
+      expect(resultado.ranking.map((r) => r.id)).toEqual(['a', 'sem-dados']);
+      expect(resultado.ranking[1]?.emissoes_total_gco2e).toBeNull();
+      expect(resultado.ranking[1]?.energia_total_kwh).toBeNull();
+    });
+  });
 });

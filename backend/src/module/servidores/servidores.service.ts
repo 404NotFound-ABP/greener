@@ -5,6 +5,21 @@ import { Injectable, InternalServerErrorException, NotFoundException, Inject } f
 import { DRIZZLE_PROVIDER, DrizzleDB, schema } from "@/database";
 import { eq, desc, inArray, sql } from "drizzle-orm";
 
+function parseNumeroOuNulo(valor: unknown): number | null {
+    if (valor === null || valor === undefined || valor === '') {
+        return null;
+    }
+    const n = Number(valor);
+    return Number.isFinite(n) ? n : null;
+}
+
+function compararNumerosComNulos(a: number | null, b: number | null, ordem: 'asc' | 'desc'): number {
+    if (a === null && b === null) return 0;
+    if (a === null) return 1;
+    if (b === null) return -1;
+    return ordem === 'desc' ? b - a : a - b;
+}
+
 @Injectable()
 export class ServidoresService {
     constructor(
@@ -101,17 +116,17 @@ export class ServidoresService {
                         pais: s.regiao.pais,
                         regiao: s.regiao.regiao,
                         cidade: s.regiao.cidade,
-                        carbon_intensity_gco2e_kwh: Number(s.regiao.carbonIntensityGco2eKwh ?? 0),
-                        renewable_share_percent: Number(s.regiao.renewableSharePercent ?? 0),
+                        carbon_intensity_gco2e_kwh: parseNumeroOuNulo(s.regiao.carbonIntensityGco2eKwh),
+                        renewable_share_percent: parseNumeroOuNulo(s.regiao.renewableSharePercent),
                     } : null,
                     ultima_coleta: ultimaMedicao ? {
-                        potencia_watts: Number(ultimaMedicao.potenciaWatts ?? 0),
-                        energia_kwh: Number(ultimaMedicao.energiaKwh ?? 0),
-                        emissoes_gco2e: Number(ultimaMedicao.emissoesGco2e ?? 0),
-                        cpu_percent: Number(ultimaMedicao.cpuPercent ?? 0),
-                        memoria_gb: Number(ultimaMedicao.memoriaGb ?? 0),
-                        disco_gb: Number(ultimaMedicao.discoGb ?? 0),
-                        rede_gb: Number(ultimaMedicao.redeGb ?? 0),
+                        potencia_watts: parseNumeroOuNulo(ultimaMedicao.potenciaWatts),
+                        energia_kwh: parseNumeroOuNulo(ultimaMedicao.energiaKwh),
+                        emissoes_gco2e: parseNumeroOuNulo(ultimaMedicao.emissoesGco2e),
+                        cpu_percent: parseNumeroOuNulo(ultimaMedicao.cpuPercent),
+                        memoria_gb: parseNumeroOuNulo(ultimaMedicao.memoriaGb),
+                        disco_gb: parseNumeroOuNulo(ultimaMedicao.discoGb),
+                        rede_gb: parseNumeroOuNulo(ultimaMedicao.redeGb),
                         coletado_em: ultimaMedicao.coletadoEm,
                     } : null,
                     atualizado_em: s.atualizadoEm,
@@ -130,18 +145,27 @@ export class ServidoresService {
         const indisponiveis = servidores.filter((s) => s.status === 'indisponivel').length;
         const removidos = servidores.filter((s) => s.status === 'removido').length;
 
-        // Soma total acumulada no banco
+        // Soma total acumulada no banco e janela temporal das coletas
         const [totais] = await this.db
             .select({
-                consumoTotalKwh: sql<string>`coalesce(sum(energia_kwh), 0)::text`,
-                emissoesTotalGco2e: sql<string>`coalesce(sum(emissoes_gco2e), 0)::text`,
+                consumoTotalKwh: sql<string | null>`sum(energia_kwh)::text`,
+                emissoesTotalGco2e: sql<string | null>`sum(emissoes_gco2e)::text`,
+                periodoInicio: sql<Date | null>`min(coletado_em)`,
+                periodoFim: sql<Date | null>`max(coletado_em)`,
             })
             .from(schema.coletasMetricas);
 
-        // Potência instantânea total dos servidores atualmente disponíveis
+        // Potência instantânea total dos servidores atualmente disponíveis com leitura válida
         const potenciaAtualWatts = servidores
-            .filter((s) => s.status === 'disponivel' && s.ultima_coleta)
+            .filter((s) => s.status === 'disponivel' && s.ultima_coleta?.potencia_watts != null)
             .reduce((acc, s) => acc + (s.ultima_coleta?.potencia_watts ?? 0), 0);
+
+        const servidoresComMetricas = servidores.filter(
+            (s) => s.ultima_coleta !== null && s.ultima_coleta.potencia_watts !== null,
+        ).length;
+        const servidoresSemMetricas = servidores.length - servidoresComMetricas;
+        const consumoTotal = parseNumeroOuNulo(totais?.consumoTotalKwh);
+        const emissoesTotal = parseNumeroOuNulo(totais?.emissoesTotalGco2e);
 
         return {
             resumo: {
@@ -149,9 +173,14 @@ export class ServidoresService {
                 disponiveis,
                 indisponiveis,
                 removidos,
+                servidores_com_metricas: servidoresComMetricas,
+                servidores_sem_metricas: servidoresSemMetricas,
+                cobertura_parcial: servidores.length > 0 && servidoresComMetricas < servidores.length,
+                periodo_inicio: totais?.periodoInicio ?? null,
+                periodo_fim: totais?.periodoFim ?? null,
                 potencia_atual_watts: Number(potenciaAtualWatts.toFixed(2)),
-                consumo_total_acumulado_kwh: Number(Number(totais?.consumoTotalKwh ?? 0).toFixed(6)),
-                emissoes_total_acumuladas_gco2e: Number(Number(totais?.emissoesTotalGco2e ?? 0).toFixed(4)),
+                consumo_total_acumulado_kwh: consumoTotal !== null ? Number(consumoTotal.toFixed(6)) : null,
+                emissoes_total_acumuladas_gco2e: emissoesTotal !== null ? Number(emissoesTotal.toFixed(4)) : null,
             },
             servidores,
         };
@@ -181,13 +210,13 @@ export class ServidoresService {
         const pontos = medicaoesDesc.reverse().map((m) => ({
             timestamp: m.coletadoEm,
             status: m.status,
-            potencia_watts: Number(m.potenciaWatts ?? 0),
-            energia_kwh: Number(m.energiaKwh ?? 0),
-            emissoes_gco2e: Number(m.emissoesGco2e ?? 0),
-            cpu_percent: Number(m.cpuPercent ?? 0),
-            memoria_gb: Number(m.memoriaGb ?? 0),
-            disco_gb: Number(m.discoGb ?? 0),
-            rede_gb: Number(m.redeGb ?? 0),
+            potencia_watts: parseNumeroOuNulo(m.potenciaWatts),
+            energia_kwh: parseNumeroOuNulo(m.energiaKwh),
+            emissoes_gco2e: parseNumeroOuNulo(m.emissoesGco2e),
+            cpu_percent: parseNumeroOuNulo(m.cpuPercent),
+            memoria_gb: parseNumeroOuNulo(m.memoriaGb),
+            disco_gb: parseNumeroOuNulo(m.discoGb),
+            rede_gb: parseNumeroOuNulo(m.redeGb),
         }));
 
         return {
@@ -215,16 +244,16 @@ export class ServidoresService {
             nome: s.nome,
             status: s.status,
             regiao: s.regiao?.pais ?? 'N/D',
-            intensidade_carbono_regional: s.regiao?.carbon_intensity_gco2e_kwh ?? 0,
-            potencia_watts: s.ultima_coleta?.potencia_watts ?? 0,
-            energia_kwh: s.ultima_coleta?.energia_kwh ?? 0,
-            emissoes_gco2e: s.ultima_coleta?.emissoes_gco2e ?? 0,
-            cpu_percent: s.ultima_coleta?.cpu_percent ?? 0,
-            memoria_gb: s.ultima_coleta?.memoria_gb ?? 0,
+            intensidade_carbono_regional: s.regiao?.carbon_intensity_gco2e_kwh ?? null,
+            potencia_watts: s.ultima_coleta?.potencia_watts ?? null,
+            energia_kwh: s.ultima_coleta?.energia_kwh ?? null,
+            emissoes_gco2e: s.ultima_coleta?.emissoes_gco2e ?? null,
+            cpu_percent: s.ultima_coleta?.cpu_percent ?? null,
+            memoria_gb: s.ultima_coleta?.memoria_gb ?? null,
         }));
 
-        // Ordena por maior emissão de carbono
-        comparativo.sort((a, b) => b.emissoes_gco2e - a.emissoes_gco2e);
+        // Ordena por maior emissão de carbono, mantendo nulos ao final
+        comparativo.sort((a, b) => compararNumerosComNulos(a.emissoes_gco2e, b.emissoes_gco2e, 'desc'));
 
         return {
             total_comparados: comparativo.length,
@@ -250,10 +279,10 @@ export class ServidoresService {
                     paisRegiao: schema.regioes.pais,
                     intensidadeCarbono: schema.regioes.carbonIntensityGco2eKwh,
                     totalColetas: sql<number>`count(*)::int`,
-                    totalEnergiaKwh: sql<string>`coalesce(sum(${schema.coletasMetricas.energiaKwh}), 0)::text`,
-                    totalEmissoesGco2e: sql<string>`coalesce(sum(${schema.coletasMetricas.emissoesGco2e}), 0)::text`,
-                    potenciaMediaWatts: sql<string>`coalesce(avg(${schema.coletasMetricas.potenciaWatts}), 0)::text`,
-                    cpuMediaPercent: sql<string>`coalesce(avg(${schema.coletasMetricas.cpuPercent}), 0)::text`,
+                    totalEnergiaKwh: sql<string | null>`sum(${schema.coletasMetricas.energiaKwh})::text`,
+                    totalEmissoesGco2e: sql<string | null>`sum(${schema.coletasMetricas.emissoesGco2e})::text`,
+                    potenciaMediaWatts: sql<string | null>`avg(${schema.coletasMetricas.potenciaWatts})::text`,
+                    cpuMediaPercent: sql<string | null>`avg(${schema.coletasMetricas.cpuPercent})::text`,
                 })
                 .from(schema.coletasMetricas)
                 .innerJoin(schema.servidores, eq(schema.coletasMetricas.servidorId, schema.servidores.id))
@@ -267,24 +296,31 @@ export class ServidoresService {
                     schema.regioes.carbonIntensityGco2eKwh
                 );
 
-            const ranking = dadosAgregados.map((item) => ({
-                posicao: 0,
-                id: item.servidorId,
-                nome: item.nome,
-                status: item.statusAtual,
-                regiao: item.paisRegiao ?? item.codigoRegiao ?? 'N/D',
-                intensidade_carbono: Number(item.intensidadeCarbono ?? 0),
-                total_coletas: item.totalColetas,
-                energia_total_kwh: Number(Number(item.totalEnergiaKwh).toFixed(6)),
-                emissoes_total_gco2e: Number(Number(item.totalEmissoesGco2e).toFixed(4)),
-                potencia_media_watts: Number(Number(item.potenciaMediaWatts).toFixed(2)),
-                cpu_media_percent: Number(Number(item.cpuMediaPercent).toFixed(2)),
-            }));
+            const ranking = dadosAgregados.map((item) => {
+                const energiaTotal = parseNumeroOuNulo(item.totalEnergiaKwh);
+                const emissoesTotal = parseNumeroOuNulo(item.totalEmissoesGco2e);
+                const potenciaMedia = parseNumeroOuNulo(item.potenciaMediaWatts);
+                const cpuMedia = parseNumeroOuNulo(item.cpuMediaPercent);
+
+                return {
+                    posicao: 0,
+                    id: item.servidorId,
+                    nome: item.nome,
+                    status: item.statusAtual,
+                    regiao: item.paisRegiao ?? item.codigoRegiao ?? 'N/D',
+                    intensidade_carbono: parseNumeroOuNulo(item.intensidadeCarbono),
+                    total_coletas: item.totalColetas,
+                    energia_total_kwh: energiaTotal !== null ? Number(energiaTotal.toFixed(6)) : null,
+                    emissoes_total_gco2e: emissoesTotal !== null ? Number(emissoesTotal.toFixed(4)) : null,
+                    potencia_media_watts: potenciaMedia !== null ? Number(potenciaMedia.toFixed(2)) : null,
+                    cpu_media_percent: cpuMedia !== null ? Number(cpuMedia.toFixed(2)) : null,
+                };
+            });
 
             ranking.sort((a, b) => {
                 const valorA = ordenarPor === 'emissoes' ? a.emissoes_total_gco2e : a.energia_total_kwh;
                 const valorB = ordenarPor === 'emissoes' ? b.emissoes_total_gco2e : b.energia_total_kwh;
-                return ordem === 'desc' ? valorB - valorA : valorA - valorB;
+                return compararNumerosComNulos(valorA, valorB, ordem);
             });
 
             ranking.forEach((item, idx) => {
@@ -307,17 +343,17 @@ export class ServidoresService {
                 nome: s.nome,
                 status: s.status,
                 regiao: s.regiao?.pais ?? 'N/D',
-                intensidade_carbono: s.regiao?.carbon_intensity_gco2e_kwh ?? 0,
-                potencia_watts: s.ultima_coleta?.potencia_watts ?? 0,
-                energia_kwh: s.ultima_coleta?.energia_kwh ?? 0,
-                emissoes_gco2e: s.ultima_coleta?.emissoes_gco2e ?? 0,
-                cpu_percent: s.ultima_coleta?.cpu_percent ?? 0,
+                intensidade_carbono: s.regiao?.carbon_intensity_gco2e_kwh ?? null,
+                potencia_watts: s.ultima_coleta?.potencia_watts ?? null,
+                energia_kwh: s.ultima_coleta?.energia_kwh ?? null,
+                emissoes_gco2e: s.ultima_coleta?.emissoes_gco2e ?? null,
+                cpu_percent: s.ultima_coleta?.cpu_percent ?? null,
             }));
 
             ranking.sort((a, b) => {
                 const valorA = ordenarPor === 'emissoes' ? a.emissoes_gco2e : a.energia_kwh;
                 const valorB = ordenarPor === 'emissoes' ? b.emissoes_gco2e : b.energia_kwh;
-                return ordem === 'desc' ? valorB - valorA : valorA - valorB;
+                return compararNumerosComNulos(valorA, valorB, ordem);
             });
 
             ranking.forEach((item, idx) => {

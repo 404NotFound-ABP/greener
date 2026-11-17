@@ -38,8 +38,14 @@ export class CollectorService implements OnApplicationBootstrap {
     if (this.executando) {
       return { status: 'em_andamento', mensagem: 'Uma coleta já está em andamento.' };
     }
-    // Executa em segundo plano ou aguarda
     const resultado = await this.executarCicloColeta();
+    if ('erro' in resultado && resultado.erro) {
+      return {
+        status: 'erro',
+        mensagem: `Falha ao executar ciclo de coleta: ${resultado.erro}`,
+        detalhes: resultado,
+      };
+    }
     return {
       status: 'sucesso',
       mensagem: 'Ciclo de coleta executado com sucesso.',
