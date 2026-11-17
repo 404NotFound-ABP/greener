@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { HttpService } from '@nestjs/axios';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import type { DrizzleDB } from '@/database';
+import { IntervalosConfigService } from '@/database/intervalos-config.service';
 import * as schema from '@/database/schema';
 
 const carregarAmbiente = jest.fn(() => {
@@ -445,5 +446,203 @@ describe('ServidoresService — consultas do banco', () => {
       expect(resultado.ranking[1]?.emissoes_total_gco2e).toBeNull();
       expect(resultado.ranking[1]?.energia_total_kwh).toBeNull();
     });
+
+    it('RF13: retorna coordenadas da região quando disponíveis e null quando ausentes', async () => {
+      // Arrange
+      const comCoordenadas = {
+        ...servidor('a'),
+        regiao: {
+          ...servidor('a').regiao,
+          latitude: '-23.55',
+          longitude: '-46.63',
+        },
+      };
+      const semCoordenadas = {
+        ...servidor('b'),
+        regiao: {
+          ...servidor('b').regiao,
+          latitude: null,
+          longitude: null,
+        },
+      };
+      contexto.fila.push([comCoordenadas, semCoordenadas], [], []);
+
+      // Act
+      const resultado = await contexto.service.listServidoresDoBanco();
+
+      // Assert
+      expect(resultado[0]).toMatchObject({
+        id: 'a',
+        nome: 'Serviço a',
+        regiao: { codigo: 'br-sudeste', latitude: -23.55, longitude: -46.63 },
+      });
+      expect(resultado[1]).toMatchObject({
+        id: 'b',
+        nome: 'Serviço b',
+        regiao: { codigo: 'br-sudeste', latitude: null, longitude: null },
+      });
+    });
+
+    it('usa intervalo_atualizacao_segundos padrão de IntervalosConfigService e aceita janelaSegundos válida', async () => {
+      // Arrange
+      const intervalosConfig = new IntervalosConfigService();
+      intervalosConfig.setIntervalos(300, 1800, new Date('2026-11-16T23:00:00Z'));
+      const serviceComConfig = new ServidoresService(
+        {} as HttpService,
+        {
+          select: () => ({
+            from: () => {
+              const q: Record<string, unknown> = {
+                where: () => q,
+                orderBy: () => q,
+                innerJoin: () => q,
+                leftJoin: () => q,
+                limit: async () => [],
+                then: (res: (v: unknown[]) => unknown) => Promise.resolve([]).then(res),
+              };
+              return q;
+            },
+          }),
+        } as unknown as DrizzleDB,
+        intervalosConfig,
+      );
+
+      // Act
+      const padrao = await serviceComConfig.getHistoricoServidor('a').catch(() => null);
+      const comparativoPadrao = await serviceComConfig.getComparativo();
+      const comparativoCustom = await serviceComConfig.getComparativo(undefined, 86400);
+
+      // Assert
+      expect(padrao).toBeNull(); // select() vazio retorna 404 para servidor 'a'
+      expect(comparativoPadrao.janela_amostragem_segundos).toBe(1800);
+      expect(comparativoCustom.janela_amostragem_segundos).toBe(86400);
+      await expect(serviceComConfig.getComparativo(undefined, 45)).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('RF10: filtra histórico por dataInicial e dataFinal, informa período e ordena cronologicamente', async () => {
+      // Arrange
+      const recente = coleta('0.02', '8', '2026-11-12T12:00:00Z');
+      const antiga = coleta('0.01', '4', '2026-11-12T10:00:00Z');
+      contexto.fila.push([servidor('a')], [recente, antiga]);
+
+      // Act
+      const resultado = await contexto.service.getHistoricoServidor(
+        'a',
+        30,
+        undefined,
+        '2026-11-12T09:00:00Z',
+        '2026-11-12T13:00:00Z',
+      );
+
+      // Assert
+      expect(resultado.periodo).toEqual({
+        inicio: new Date('2026-11-12T09:00:00Z'),
+        fim: new Date('2026-11-12T13:00:00Z'),
+      });
+      expect(resultado.pontos.map((p) => p.timestamp)).toEqual([antiga.coletadoEm, recente.coletadoEm]);
+    });
+
+    it('RF10: recusa datas inválidas ou dataInicial posterior a dataFinal', async () => {
+      await expect(
+        contexto.service.getHistoricoServidor('a', 30, undefined, 'data-invalida', undefined),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      await expect(
+        contexto.service.getHistoricoServidor(
+          'a',
+          30,
+          undefined,
+          '2026-11-12T15:00:00Z',
+          '2026-11-12T10:00:00Z',
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('RF15: inclui disco_gb, rede_gb, periodo e unidades no comparativo preservando nulos', async () => {
+      // Arrange
+      const itens = [
+        {
+          id: 'a', nome: 'A', status: 'disponivel',
+          regiao: { pais: 'Brasil', carbon_intensity_gco2e_kwh: 400 },
+          ultima_coleta: {
+            potencia_watts: 40, energia_kwh: 1, emissoes_gco2e: 5,
+            cpu_percent: 50, memoria_gb: 4, disco_gb: 20, rede_gb: 1.5,
+          },
+        },
+        { id: 'sem-dados', nome: 'Sem Dados', status: 'sem_metricas', regiao: null, ultima_coleta: null },
+      ] as Awaited<ReturnType<typeof contexto.service.listServidoresDoBanco>>;
+      jest.spyOn(contexto.service, 'listServidoresDoBanco').mockResolvedValue(itens);
+
+      // Act
+      const resultado = await contexto.service.getComparativo();
+
+      // Assert
+      expect(resultado.periodo.inicio).toBeInstanceOf(Date);
+      expect(resultado.periodo.fim).toBeInstanceOf(Date);
+      expect(resultado.unidades).toMatchObject({
+        cpu_percent: '%',
+        memoria_gb: 'GB',
+        disco_gb: 'GB',
+        rede_gb: 'GB',
+        potencia_watts: 'W',
+        energia_kwh: 'kWh',
+        emissoes_gco2e: 'gCO2e',
+        intensidade_carbono_regional: 'gCO2e/kWh',
+      });
+      expect(resultado.servidores[0]).toMatchObject({ disco_gb: 20, rede_gb: 1.5 });
+      expect(resultado.servidores[1]).toMatchObject({ disco_gb: null, rede_gb: null, emissoes_gco2e: null });
+    });
+
+    it('RF14 (#128): informa periodo no ranking e aplica desempate determinístico por nome e id', async () => {
+      // Arrange — empatados no indicador principal e fora de ordem alfabética
+      contexto.fila.push([
+        {
+          servidorId: 'id-2', nome: 'Beta', statusAtual: 'disponivel', codigoRegiao: 'br',
+          paisRegiao: 'Brasil', intensidadeCarbono: '400', totalColetas: 2,
+          totalEnergiaKwh: '2', totalEmissoesGco2e: '10', potenciaMediaWatts: '40', cpuMediaPercent: '40',
+        },
+        {
+          servidorId: 'id-1', nome: 'Alpha', statusAtual: 'disponivel', codigoRegiao: 'br',
+          paisRegiao: 'Brasil', intensidadeCarbono: '400', totalColetas: 2,
+          totalEnergiaKwh: '2', totalEmissoesGco2e: '10', potenciaMediaWatts: '40', cpuMediaPercent: '40',
+        },
+        {
+          servidorId: 'id-3', nome: 'Alpha', statusAtual: 'disponivel', codigoRegiao: 'br',
+          paisRegiao: 'Brasil', intensidadeCarbono: '400', totalColetas: 2,
+          totalEnergiaKwh: '2', totalEmissoesGco2e: '10', potenciaMediaWatts: '40', cpuMediaPercent: '40',
+        },
+      ]);
+
+      // Act
+      const resultado = await contexto.service.getRankingServidores(
+        'emissoes',
+        'desc',
+        'acumulado',
+        10,
+        undefined,
+        '2026-11-16T00:00:00Z',
+        '2026-11-16T23:59:59Z',
+      );
+
+      // Assert
+      expect(resultado.periodo).toEqual({
+        inicio: new Date('2026-11-16T00:00:00Z'),
+        fim: new Date('2026-11-16T23:59:59Z'),
+      });
+      expect(resultado.ranking.map((r) => `${r.nome}:${r.id}`)).toEqual([
+        'Alpha:id-1',
+        'Alpha:id-3',
+        'Beta:id-2',
+      ]);
+    });
+
+    it.each([0, -5, 1.5, 1001, Number.NaN])(
+      'RF10 (#71): recusa limite inválido (%s) na consulta histórica',
+      async (limiteInvalido) => {
+        await expect(
+          contexto.service.getHistoricoServidor('a', limiteInvalido),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      },
+    );
   });
 });

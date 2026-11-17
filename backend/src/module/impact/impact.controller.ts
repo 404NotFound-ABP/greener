@@ -11,14 +11,17 @@ export class ImpactController {
   @Get(':id/discriminado')
   @ApiOperation({ summary: 'Detalhamento do consumo e emissões de carbono discriminados por métrica (CPU, Memória, Disco, Rede)' })
   @ApiParam({ name: 'id', description: 'ID do servidor (ex: billing-api)', example: 'billing-api' })
-  @ApiQuery({ name: 'criterio', required: false, enum: ['instantaneo', 'acumulado'], description: 'Critério: instantaneo (coleta atual) ou acumulado (soma histórica de todas as medições salvas no PostgreSQL). Padrão: instantaneo' })
+  @ApiQuery({ name: 'criterio', required: false, enum: ['instantaneo', 'acumulado'], description: 'Critério: instantaneo (coleta atual) ou acumulado (soma histórica dentro da janela configurada). Padrão: instantaneo' })
+  @ApiQuery({ name: 'janelaSegundos', required: false, description: 'Janela de amostragem em segundos (300, 900, 1800, 3600, 86400, 2592000). Padrão: configurado no sistema' })
   @ApiResponse({ status: 200, description: 'Cálculo de impacto ambiental discriminado por recurso', type: ServidorImpactoDiscriminadoResponseDto })
   @ApiResponse({ status: 404, description: 'Servidor não encontrado' })
   async getImpactoDiscriminado(
     @Param('id') id: string,
     @Query('criterio') criterio?: 'instantaneo' | 'acumulado',
+    @Query('janelaSegundos') janelaSegundos?: string,
   ): Promise<ServidorImpactoDiscriminadoResponseDto> {
-    return this.impactService.calcularImpactoDiscriminadoPorServidor(id, criterio);
+    const janela = janelaSegundos !== undefined ? Number(janelaSegundos) : undefined;
+    return this.impactService.calcularImpactoDiscriminadoPorServidor(id, criterio, janela);
   }
 
   @ApiTags('APIs Externas - Tempo Real')

@@ -1,4 +1,47 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { IsIn, IsInt } from 'class-validator';
+
+// Intervalos permitidos em segundos: 5m, 15m, 30m, 1h, 1d, 1 mês (30d)
+export const INTERVALOS_PERMITIDOS_SEGUNDOS = [300, 900, 1800, 3600, 86400, 2592000] as const;
+export const INTERVALO_PADRAO_SEGUNDOS = 300;
+
+export class AtualizarIntervalosDto {
+  @ApiProperty({
+    example: 300,
+    enum: INTERVALOS_PERMITIDOS_SEGUNDOS,
+    description: 'Frequência do coletor em segundos: 300 (5m), 900 (15m), 1800 (30m), 3600 (1h), 86400 (1d) ou 2592000 (1 mês)',
+  })
+  @IsInt({ message: 'intervalo_coleta_segundos deve ser um número inteiro.' })
+  @IsIn(INTERVALOS_PERMITIDOS_SEGUNDOS, {
+    message: 'intervalo_coleta_segundos inválido. Valores permitidos: 300, 900, 1800, 3600, 86400, 2592000.',
+  })
+  intervalo_coleta_segundos!: number;
+
+  @ApiProperty({
+    example: 300,
+    enum: INTERVALOS_PERMITIDOS_SEGUNDOS,
+    description: 'Intervalo de atualização da apresentação no frontend em segundos: 300 (5m), 900 (15m), 1800 (30m), 3600 (1h), 86400 (1d) ou 2592000 (1 mês)',
+  })
+  @IsInt({ message: 'intervalo_atualizacao_segundos deve ser um número inteiro.' })
+  @IsIn(INTERVALOS_PERMITIDOS_SEGUNDOS, {
+    message: 'intervalo_atualizacao_segundos inválido. Valores permitidos: 300, 900, 1800, 3600, 86400, 2592000.',
+  })
+  intervalo_atualizacao_segundos!: number;
+}
+
+export class ConfiguracaoIntervalosDto {
+  @ApiProperty({ example: 300, description: 'Frequência configurada para o coletor em segundos' })
+  intervalo_coleta_segundos!: number;
+
+  @ApiProperty({ example: 300, description: 'Intervalo de atualização configurado para o frontend em segundos' })
+  intervalo_atualizacao_segundos!: number;
+
+  @ApiProperty({ example: [...INTERVALOS_PERMITIDOS_SEGUNDOS], type: [Number] })
+  intervalos_permitidos_segundos!: number[];
+
+  @ApiProperty({ example: '2026-11-16T23:41:00.000Z', nullable: true })
+  atualizado_em!: Date | null;
+}
 
 export class DetalhesColetaDto {
   @ApiProperty({ example: 8 })
@@ -26,8 +69,11 @@ export class CollectorStatusDto {
   @ApiProperty({ example: false })
   executando!: boolean;
 
-  @ApiProperty({ example: 30, description: 'Intervalo configurado em segundos' })
+  @ApiProperty({ example: 300, description: 'Intervalo configurado do coletor em segundos' })
   intervaloConfiguradoSegundos!: number;
+
+  @ApiProperty({ example: 300, description: 'Intervalo de atualização para o frontend em segundos' })
+  intervaloAtualizacaoSegundos!: number;
 
   @ApiProperty({ example: '2026-10-25T20:47:18.311Z', nullable: true })
   ultimaExecucao!: Date | null;
