@@ -1,29 +1,23 @@
 # Documentação do GreenER
 
-Este diretório reúne a documentação técnica, o planejamento e o contexto acadêmico do GreenER.
+Para preparar a demonstração de **10/11/2026**, comece pelo [relatório da Sprint 2](sprints/sprint-2.md). Ele registra a versão testada, os resultados no Docker e no navegador e o que falta para o aceite. Para executar a mesma versão, siga o [guia de instalação](../README.md).
 
-O projeto está em preparação inicial. As propostas serão atualizadas conforme as decisões da equipe e o desenvolvimento da aplicação.
+## Documentação técnica
 
-
-## Contexto e planejamento acadêmico
-
-| Documento | Conteúdo |
+| Documento | O que consultar |
 |---|---|
-| [Contexto](academico/contexto.md) | Apresentação do desafio, contexto acadêmico e fontes de orientação. |
-| [Equipe](academico/equipe.md) | Integrantes, papéis e responsabilidades. |
-| [Backlog](academico/backlog.md) | Épicos, histórias, prioridades e critérios de aceite. |
+| [Arquitetura](arquitetura.md) | Caminho dos dados da UniLaunch ao PostgreSQL, componentes e pontos de integração |
+| [API](api.md) | Contratos externos e rotas do backend para coleta e consulta |
+| [Cálculos ambientais](calculos.md) | Fórmula, unidades, intervalo da leitura, exemplo conferido e tratamento de ausências |
+| [Interface](interface.md) | Fluxos do protótipo, uso de dados simulados e resultado da verificação mobile |
+| [Frontend](../frontend/README.md) | Execução do React, build, lint e limites das telas |
+| [Backend](../backend/README.md) | Execução do NestJS, migrações e acesso ao Swagger |
 
+## Produto e entregas
 
-## Registros das sprints
+- [Enunciado do desafio](Desafio%203DSM%20-%202026-2.pdf) e [contexto do projeto](academico/contexto.md).
+- [Backlog e critérios de aceite](academico/backlog.md), [plano das três sprints](plano-de-entregas.md) e [Definition of Done](definition-of-done.md).
+- [Sprint 1 e devolutiva do cliente](sprints/sprint-1.md). O [snapshot histórico](https://github.com/404NotFound-ABP/greener/blob/d69dcf2347bb5962b3ef662b215bdae92de94d16/docs/evidencias/sprint-1/README.md) preserva as evidências da época.
+- [Sprint 2 em preparação](sprints/sprint-2.md) e [escopo previsto para a Sprint 3](sprints/sprint-3.md).
+- [Equipe e contribuições](academico/equipe.md), [quadro do projeto](https://github.com/users/404NotFound-ABP/projects/5/views/2) e [issues](https://github.com/404NotFound-ABP/greener/issues).
 
-- [Sprint 1](academico/sprints/sprint-1.md)
-- [Sprint 2](academico/sprints/sprint-2.md)
-- [Sprint 3](academico/sprints/sprint-3.md)
-
-Cada registro reunirá o planejamento, o acompanhamento, as evidências da entrega, a Sprint Review, a retrospectiva e as ações de melhoria.
-
-## Situação dos documentos
-
-Os documentos devem distinguir informações confirmadas, propostas e decisões pendentes. Funcionalidades planejadas não representam funcionalidades implementadas.
-
-[Voltar à apresentação do projeto](../README.md)
