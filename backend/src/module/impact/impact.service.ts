@@ -1,11 +1,16 @@
-import { Injectable, Inject, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Inject, NotFoundException, Optional } from '@nestjs/common';
 import { ServidoresService } from '@/module/servidores/servidores.service';
 import { CarbonService } from '@/module/carbon/carbon.service';
 import { CarbonIntensityResponse } from '@/module/interface/carbon.interface';
 import { ServidorMetricsData } from '@/module/interface/servidor.interface';
 import { ServidorImpactoResponseDto, ServidorImpactoDiscriminadoResponseDto } from './dto/impact.dto';
 import { DRIZZLE_PROVIDER, DrizzleDB, schema } from '@/database';
-import { eq, desc } from 'drizzle-orm';
+import {
+  INTERVALO_PADRAO_SEGUNDOS,
+  INTERVALOS_PERMITIDOS_SEGUNDOS,
+  IntervalosConfigService,
+} from '@/database/intervalos-config.service';
+import { and, eq, desc, gte } from 'drizzle-orm';
 
 export class CalculadoraImpacto {
   static readonly CPU_MAX_WATTS = 100;
@@ -102,7 +107,21 @@ export class ImpactService {
     private readonly servidoresService: ServidoresService,
     private readonly carbonService: CarbonService,
     @Inject(DRIZZLE_PROVIDER) private readonly db: DrizzleDB,
+    @Optional() private readonly intervalosConfig?: IntervalosConfigService,
   ) {}
+
+  private resolverJanelaSegundos(janelaSegundos?: number): number {
+    if (janelaSegundos !== undefined) {
+      const permitidos = INTERVALOS_PERMITIDOS_SEGUNDOS as readonly number[];
+      if (!Number.isInteger(janelaSegundos) || !permitidos.includes(janelaSegundos)) {
+        throw new BadRequestException(
+          `janelaSegundos inválida. Valores permitidos: ${permitidos.join(', ')}.`,
+        );
+      }
+      return janelaSegundos;
+    }
+    return this.intervalosConfig?.getIntervaloAtualizacaoSegundos() ?? INTERVALO_PADRAO_SEGUNDOS;
+  }
 
   async calcularImpactoPorServidor(idServidor: string): Promise<ServidorImpactoResponseDto> {
     // 1. Busca dados cadastrais do servidor
@@ -290,7 +309,10 @@ export class ImpactService {
   async calcularImpactoDiscriminadoPorServidor(
     idServidor: string,
     criterio: 'instantaneo' | 'acumulado' = 'instantaneo',
+    janelaSegundos?: number,
   ): Promise<ServidorImpactoDiscriminadoResponseDto> {
+    const janela = this.resolverJanelaSegundos(janelaSegundos);
+    const dataCorte = new Date(Date.now() - janela * 1000);
     // 1. Busca dados cadastrais do servidor
     let servidor;
     let servidorDb: typeof schema.servidores.$inferSelect | undefined = undefined;
@@ -355,7 +377,12 @@ export class ImpactService {
           carbonIntensityFator: schema.coletasMetricas.carbonIntensityFator,
         })
         .from(schema.coletasMetricas)
-        .where(eq(schema.coletasMetricas.servidorId, idServidor));
+        .where(
+          and(
+            eq(schema.coletasMetricas.servidorId, idServidor),
+            gte(schema.coletasMetricas.coletadoEm, dataCorte),
+          ),
+        );
 
       if (coletas.length > 0) {
         let totalEnergiaCpu = 0;
@@ -528,11 +555,16 @@ export class ImpactService {
       };
     }
 
-    // Caso contrário (servidor indisponível ou removido), busca a última coleta gravada no banco
+    // Caso contrário (servidor indisponível ou removido), busca a última coleta gravada no banco na janela
     const [ultimaColeta] = await this.db
       .select()
       .from(schema.coletasMetricas)
-      .where(eq(schema.coletasMetricas.servidorId, idServidor))
+      .where(
+        and(
+          eq(schema.coletasMetricas.servidorId, idServidor),
+          gte(schema.coletasMetricas.coletadoEm, dataCorte),
+        ),
+      )
       .orderBy(desc(schema.coletasMetricas.coletadoEm))
       .limit(1);
 

@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { Logger, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, Logger, ServiceUnavailableException, ValidationPipe } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { JwtAuthGuard } from '@/module/auth/guards/jwt-auth.guard';
+import { RolesGuard } from '@/module/auth/guards/roles.guard';
+import { AtualizarIntervalosDto, INTERVALOS_PERMITIDOS_SEGUNDOS } from './dto/collector.dto';
 import { config } from '@/config/config';
 import type { DrizzleDB } from '@/database';
 import * as schema from '@/database/schema';
@@ -372,8 +376,7 @@ describe('CollectorService', () => {
 
     // Assert
     expect(executar).toHaveBeenCalledTimes(2);
-    expect(Reflect.getMetadata('SCHEDULE_INTERVAL_OPTIONS', service.handleInterval))
-      .toEqual({ timeout: config.INTERVALO_COLETA_SEGUNDOS * 1000 });
+    service.onModuleDestroy();
   });
 
   it('retorna o resultado da coleta manual', async () => {
@@ -423,5 +426,81 @@ describe('CollectorService', () => {
       detalhes: { servidoresProcessados: 0, erro: 'Serviço de métricas indisponível (503)' },
     });
     expect(erroController).toBeInstanceOf(ServiceUnavailableException);
+  });
+
+  describe('RF16 e reagendamento dinâmico — intervalos de coleta e atualização', () => {
+    it.each(INTERVALOS_PERMITIDOS_SEGUNDOS)(
+      'salva no banco o intervalo permitido %is e reagenda sem reiniciar',
+      async (intervalo) => {
+        // Arrange
+        const { service, banco } = prepararColetor();
+        const executar = jest.spyOn(service, 'executarCicloColeta')
+          .mockResolvedValue({ servidoresProcessados: 0, duracaoSegundos: 0 });
+
+        // Act
+        const salvo = await service.atualizarConfiguracaoIntervalos({
+          intervalo_coleta_segundos: intervalo,
+          intervalo_atualizacao_segundos: intervalo,
+        });
+
+        // Assert
+        expect(salvo).toMatchObject({
+          intervalo_coleta_segundos: intervalo,
+          intervalo_atualizacao_segundos: intervalo,
+        });
+        expect(banco.alteracoesPorConflito.some((c) => c.tabela === schema.configuracoesSistema)).toBe(true);
+
+        // Avança exatamente o intervalo configurado (inclusive 1 mês = 2.592.000s sem overflow)
+        await jest.advanceTimersByTimeAsync(intervalo * 1000);
+        expect(executar).toHaveBeenCalledTimes(1);
+        service.onModuleDestroy();
+      },
+    );
+
+    it('recusa valores inválidos preservando a configuração anterior', async () => {
+      // Arrange
+      const { service, banco } = prepararColetor();
+      await service.atualizarConfiguracaoIntervalos({
+        intervalo_coleta_segundos: 900,
+        intervalo_atualizacao_segundos: 1800,
+      });
+      const gravacoesAntes = banco.alteracoesPorConflito.length;
+
+      // Act & Assert
+      await expect(
+        service.atualizarConfiguracaoIntervalos({
+          intervalo_coleta_segundos: 45,
+          intervalo_atualizacao_segundos: 900,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      const atual = await service.getConfiguracaoIntervalos();
+      expect(atual).toMatchObject({
+        intervalo_coleta_segundos: 900,
+        intervalo_atualizacao_segundos: 1800,
+      });
+      expect(banco.alteracoesPorConflito).toHaveLength(gravacoesAntes);
+      service.onModuleDestroy();
+    });
+
+    it('protege consulta com JWT e atualização com JWT + role admin no controller', async () => {
+      // Arrange
+      const reflector = new Reflector();
+      const guardsGet = Reflect.getMetadata('__guards__', CollectorController.prototype.getConfiguracao);
+      const guardsPut = Reflect.getMetadata('__guards__', CollectorController.prototype.atualizarConfiguracao);
+      const rolesPut = reflector.get<string[]>('roles', CollectorController.prototype.atualizarConfiguracao);
+      const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true });
+
+      // Assert
+      expect(guardsGet).toEqual([JwtAuthGuard]);
+      expect(guardsPut).toEqual([JwtAuthGuard, RolesGuard]);
+      expect(rolesPut).toEqual(['admin']);
+      await expect(
+        pipe.transform(
+          { intervalo_coleta_segundos: 123, intervalo_atualizacao_segundos: 300 },
+          { type: 'body', metatype: AtualizarIntervalosDto },
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
   });
 });
