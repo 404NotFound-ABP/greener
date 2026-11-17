@@ -246,6 +246,13 @@ export class ServidoresService {
         return data;
     }
 
+    private validarLimiteHistorico(limite: number): number {
+        if (!Number.isInteger(limite) || limite < 1 || limite > 1000) {
+            throw new BadRequestException('limite inválido. Informe um número inteiro entre 1 e 1000.');
+        }
+        return limite;
+    }
+
     // Histórico de medições de um servidor para gráficos temporais dentro do período/janela
     async getHistoricoServidor(
         idServidor: string,
@@ -254,6 +261,7 @@ export class ServidoresService {
         dataInicial?: string,
         dataFinal?: string,
     ) {
+        const limiteValidado = this.validarLimiteHistorico(limite);
         const inicioInformado = this.parseDataParametro(dataInicial, 'dataInicial');
         const fimInformado = this.parseDataParametro(dataFinal, 'dataFinal');
 
@@ -293,7 +301,7 @@ export class ServidoresService {
             .from(schema.coletasMetricas)
             .where(and(...condicoes))
             .orderBy(desc(schema.coletasMetricas.coletadoEm))
-            .limit(limite);
+            .limit(limiteValidado);
 
         // Inverte para retornar em ordem cronológica (ideal para gráficos de linha)
         const pontos = medicaoesDesc.reverse().map((m) => ({

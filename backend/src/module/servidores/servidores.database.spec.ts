@@ -635,5 +635,14 @@ describe('ServidoresService — consultas do banco', () => {
         'Beta:id-2',
       ]);
     });
+
+    it.each([0, -5, 1.5, 1001, Number.NaN])(
+      'RF10 (#71): recusa limite inválido (%s) na consulta histórica',
+      async (limiteInvalido) => {
+        await expect(
+          contexto.service.getHistoricoServidor('a', limiteInvalido),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      },
+    );
   });
 });
