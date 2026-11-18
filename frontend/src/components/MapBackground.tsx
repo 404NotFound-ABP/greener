@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Tooltip, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import * as L from 'leaflet';
@@ -6,14 +6,24 @@ import * as L from 'leaflet';
 import { ServiceModal } from './ServiceModal';
 import type { ModalServiceData } from './ServiceModal';
 import { Sidebar } from './Sidebar';
-
+import type { MobileSheetView } from './Sidebar';
+import type { MainTab } from './MainLayout';
+import type { ServiceData } from '../types/service';
+import { matchesServiceStatus } from '../config/statusConfig';
+import {
+  CallbackServiceRepository,
+  defaultServiceRepository,
+  type ServiceRepository
+} from '../adapters/serviceAdapter';
+import { useServicesPolling } from '../hooks/useServicesPolling';
 
 export interface MapBackgroundProps {
   onLogout?: () => void;
+  onSelectTab?: (tab: MainTab) => void;
+  repository?: ServiceRepository;
+  onFetchServices?: () => Promise<ServiceData[]>;
 }
 
-// 1. CONFIGURAÇÃO DOS TEMAS DO MAPA (Escuro vs Satélite)
-// O modo escuro utiliza o OpenStreetMap padrão invertido via filtro CSS (sem necessidade de API Key)
 const themes = {
   dark: {
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -27,37 +37,170 @@ const themes = {
   }
 };
 
-// 2. IMAGENS DE PRÉ-VISUALIZAÇÃO DO BOTÃO DE CAMADAS (Miniatura 100x100px)
-// Usa os servidores da Esri para evitar erros 403 de bloqueio em localhost
 const previewTiles = {
   satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/13/4655/3050',
   dark: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/13/4655/3050'
 };
 
-// 3. DADOS MOCKADOS DOS MARCADORES NO MAPA (Bolinhas dos Serviços)
-const mapMarkersData: (ModalServiceData & { coords: [number, number] })[] = [
-  { id: 1, name: 'ASTAH-XYZ', status: 'ativo', location: 'Jacareí', coords: [-23.3053, -45.9658] },
-  { id: 2, name: 'ASTAH-PQR', status: 'indisponível', location: 'Caçapava', coords: [-23.1000, -45.7000] },
-  { id: 3, name: 'ASTAH-STU', status: 'sem_metricas', location: 'Taubaté', coords: [-23.0333, -45.5500] }
-];
+/**
+ * Extrai e valida coordenadas de múltiplos formatos possíveis vindos da API.
+ * Retorna null quando ausentes, nulas, vazias ou fora da faixa geográfica válida.
+ */
+export function extractValidCoordinates(service: ServiceData): [number, number] | null {
+  const raw = service as ServiceData & {
+    coordenadas?:
+      | {
+          lat?: number | null;
+          lng?: number | null;
+          latitude?: number | null;
+          longitude?: number | null;
+        }
+      | [number, number]
+      | null;
+    coords?: [number, number] | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    lat?: number | null;
+    lng?: number | null;
+  };
 
-export const MapBackground: React.FC = () => {
-  // Estado que controla o tema atual do mapa ('dark' ou 'satellite')
+  let lat: number | null | undefined;
+  let lng: number | null | undefined;
+
+  if (Array.isArray(raw.coords)) {
+    [lat, lng] = raw.coords;
+  } else if (Array.isArray(raw.coordenadas)) {
+    [lat, lng] = raw.coordenadas;
+  } else if (raw.coordenadas && typeof raw.coordenadas === 'object' && !Array.isArray(raw.coordenadas)) {
+    lat = raw.coordenadas.lat ?? raw.coordenadas.latitude;
+    lng = raw.coordenadas.lng ?? raw.coordenadas.longitude;
+  } else {
+    lat = raw.latitude ?? raw.lat;
+    lng = raw.longitude ?? raw.lng;
+  }
+
+  if (
+    typeof lat !== 'number' ||
+    typeof lng !== 'number' ||
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lng) ||
+    lat < -90 ||
+    lat > 90 ||
+    lng < -180 ||
+    lng > 180
+  ) {
+    return null;
+  }
+
+  return [lat, lng];
+}
+
+/**
+ * Formata a localização textual tratando ausência parcial ou total de cidade, região e país (T23.2/US10).
+ */
+export function formatServiceLocation(localizacao?: {
+  cidade?: string | null;
+  regiao?: string | null;
+  pais?: string | null;
+} | null): { text: string; isIncomplete: boolean } {
+  const cidade = localizacao?.cidade?.trim() || '';
+  const regiao = localizacao?.regiao?.trim() || '';
+  const pais = localizacao?.pais?.trim() || '';
+
+  const parts = [cidade, regiao, pais].filter(Boolean);
+
+  if (parts.length === 0) {
+    return { text: 'Localização não informada', isIncomplete: true };
+  }
+
+  if (parts.length < 3) {
+    const missing: string[] = [];
+    if (!cidade) missing.push('cidade');
+    if (!regiao) missing.push('região');
+    if (!pais) missing.push('país');
+
+    return {
+      text: `${parts.join(', ')} (${missing.join('/')} não informado)`,
+      isIncomplete: true
+    };
+  }
+
+  return { text: parts.join(', '), isIncomplete: false };
+}
+
+function mapStatusToModalStatus(status: string): ModalServiceData['status'] {
+  const normalized = status?.toLowerCase().trim();
+  if (normalized === 'ativo' || normalized === 'online' || normalized === 'active') {
+    return 'ativo';
+  }
+  if (normalized === 'indisponivel' || normalized === 'indisponível' || normalized === 'offline' || normalized === 'inactive') {
+    return 'indisponível';
+  }
+  return 'sem_metricas';
+}
+
+function toModalServiceData(service: ServiceData): ModalServiceData {
+  const loc = formatServiceLocation(service.localizacao);
+  return {
+    ...(service as unknown as ModalServiceData),
+    id: service.id,
+    name: service.nome || 'Serviço sem nome',
+    status: mapStatusToModalStatus(service.status),
+    location: loc.text
+  };
+}
+
+export const MapBackground: React.FC<MapBackgroundProps> = ({
+  onLogout,
+  onSelectTab,
+  repository,
+  onFetchServices
+}) => {
   const [currentTheme, setCurrentTheme] = useState<'dark' | 'satellite'>('dark');
-
-  // Estado compartilhado que controla se a Sidebar está minimizada ou expandida
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
+  const [mobileSheetView, setMobileSheetView] = useState<MobileSheetView>('filters');
 
-  // Estado dos filtros de status dos serviços (Ativo, Indisponível, Sem métricas)
-  const [mapInstance, setMapInstance] = useState<L.Map | null>(null); 
-  
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuContainerRef = useRef<HTMLDivElement | null>(null);
+
+  const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
+  const [tileErrorCount, setTileErrorCount] = useState(0);
+  const [tileRetryKey, setTileRetryKey] = useState(0);
+  const [selectedListService, setSelectedListService] = useState<ServiceData | null>(null);
+
   const [activeFilters, setActiveFilters] = useState({
     ativo: true,
     indisponível: true,
     sem_metricas: true
   });
 
-  // Função para ativar/desativar filtros clicando nos botões da Sidebar
+  const resolvedRepository = useMemo<ServiceRepository>(() => {
+    if (repository) return repository;
+    if (onFetchServices) return new CallbackServiceRepository(onFetchServices);
+    return defaultServiceRepository;
+  }, [repository, onFetchServices]);
+
+  const pollingState = useServicesPolling({ repository: resolvedRepository });
+  const { services, isRefreshing, hasError, triggerRefresh } = pollingState;
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        menuContainerRef.current &&
+        !menuContainerRef.current.contains(event.target as Node)
+      ) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    if (isMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isMenuOpen]);
+
   const toggleFilter = (status: 'ativo' | 'indisponível' | 'sem_metricas') => {
     if (mapInstance) {
       mapInstance.closePopup();
@@ -67,49 +210,121 @@ export const MapBackground: React.FC = () => {
     }, 50);
   };
 
-  // Função para alternar entre o tema Escuro e o tema Satélite
+  const resetFilters = () => {
+    if (mapInstance) {
+      mapInstance.closePopup();
+    }
+    setActiveFilters({
+      ativo: true,
+      indisponível: true,
+      sem_metricas: true
+    });
+  };
+
   const toggleTheme = () => {
+    setTileErrorCount(0);
     setCurrentTheme(prev => (prev === 'dark' ? 'satellite' : 'dark'));
   };
 
-  // Define a cor da bolinha no mapa de acordo com o status do serviço
-  const getMarkerColor = (status: string) => {
-    if (status === 'ativo') return '#2FA862'; // Verde
-    if (status === 'indisponível') return '#9C2A2A'; // Vermelho
-    return '#B8B7B8'; // Cinza (Sem métricas)
+  const handleRetryMap = () => {
+    setTileErrorCount(0);
+    setTileRetryKey(prev => prev + 1);
+    void triggerRefresh();
   };
 
-  // Filtra os marcadores que devem aparecer no mapa com base nos filtros ativos
-  const filteredMarkers = mapMarkersData.filter(
-    marker => activeFilters[marker.status as keyof typeof activeFilters]
+  const getMarkerColor = (status: ModalServiceData['status']) => {
+    if (status === 'ativo') return '#2FA862';
+    if (status === 'indisponível') return '#9C2A2A';
+    return '#B8B7B8';
+  };
+
+  const filteredServices = useMemo(
+    () => services.filter(service => matchesServiceStatus(service.status, activeFilters)),
+    [services, activeFilters]
   );
+
+  const { mappableMarkers, servicesWithoutCoordsCount } = useMemo(() => {
+    const valid: { service: ServiceData; modalData: ModalServiceData; coords: [number, number] }[] = [];
+    let missingCoords = 0;
+
+    for (const service of filteredServices) {
+      const coords = extractValidCoordinates(service);
+      if (coords) {
+        valid.push({
+          service,
+          modalData: toModalServiceData(service),
+          coords
+        });
+      } else {
+        missingCoords += 1;
+      }
+    }
+
+    return { mappableMarkers: valid, servicesWithoutCoordsCount: missingCoords };
+  }, [filteredServices]);
+
+  const handleSelectServiceFromList = (service: ServiceData) => {
+    const coords = extractValidCoordinates(service);
+    if (coords && mapInstance) {
+      mapInstance.flyTo(coords, Math.max(mapInstance.getZoom(), 13), { duration: 0.7 });
+      setSelectedListService(null);
+    } else {
+      // Serviço sem coordenadas: abre os detalhes diretamente em modal sem depender do mapa
+      setSelectedListService(service);
+    }
+  };
+
+  const handleOpenServicesList = () => {
+    setIsSidebarMinimized(false);
+    setMobileSheetView('list');
+  };
+
+  const handleMobileBackClick = () => {
+    if (mobileSheetView === 'list') {
+      setMobileSheetView('filters');
+    } else if (mobileSheetView === 'filters') {
+      setMobileSheetView('collapsed');
+    } else {
+      setMobileSheetView('filters');
+    }
+  };
+
+  const mobileFloatingBottomClass =
+    mobileSheetView === 'list'
+      ? 'bottom-[calc(58vh+12px)]'
+      : mobileSheetView === 'filters'
+      ? 'bottom-[348px]'
+      : 'bottom-[68px]';
+
+  const hasMapLayerFailure = tileErrorCount >= 4;
+  const isInitialLoading = isRefreshing && services.length === 0;
+  const showEmptyMarkersBanner = !isInitialLoading && mappableMarkers.length === 0;
 
   return (
     <div className={`relative w-full h-full bg-neutro-900 ${themes[currentTheme].cssClass}`}>
-      
       {/* =========================================================
-          COMPONENTE 1: BARRA LATERAL (SIDEBAR)
-          Recebe os filtros e o controle de minimizar/expandir
-         ========================================================= */}
+          COMPONENTE 1: BARRA LATERAL (Desktop) / BOTTOM SHEET (Mobile)
+          ========================================================= */}
       <Sidebar
         currentTheme={currentTheme}
         activeFilters={activeFilters}
         toggleFilter={toggleFilter}
+        resetFilters={resetFilters}
         isMinimized={isSidebarMinimized}
         setIsMinimized={setIsSidebarMinimized}
+        mobileSheetView={mobileSheetView}
+        setMobileSheetView={setMobileSheetView}
+        repository={resolvedRepository}
+        pollingState={pollingState}
+        onSelectService={handleSelectServiceFromList}
       />
 
-      {/* =========================================================
-          ESTILOS GLOBAIS DO LEAFLET E FILTRO DO MODO ESCURO
-          Remove o fundo branco padrão dos popups e aplica o tema escuro nos tiles
-         ========================================================= */}
       <style>{`
         .leaflet-popup-content-wrapper { background: transparent !important; box-shadow: none !important; padding: 0 !important; }
         .leaflet-popup-content { margin: 0 !important; width: auto !important; }
         .leaflet-popup-tip-container { display: none !important; }
         .leaflet-container { background: #0b1116 !important; }
         
-        /* Aplica a inversão de cores apenas nas imagens do mapa quando em modo escuro */
         .theme-dark .leaflet-tile {
           filter: invert(100%) hue-rotate(180deg) brightness(90%) contrast(105%) saturate(85%) !important;
         }
@@ -117,8 +332,7 @@ export const MapBackground: React.FC = () => {
 
       {/* =========================================================
           COMPONENTE 2: CONTAINER PRINCIPAL DO MAPA (LEAFLET)
-          Renderiza os tiles geográficos e as bolinhas de cada serviço
-         ========================================================= */}
+          ========================================================= */}
       <MapContainer
         ref={setMapInstance}
         center={[-23.3053, -45.9658]}
@@ -126,74 +340,332 @@ export const MapBackground: React.FC = () => {
         className="w-full h-full z-0"
         zoomControl={false}
       >
-        {/* Camada de imagens do mapa (muda conforme o tema atual) */}
         <TileLayer
-          key={currentTheme}
+          key={`${currentTheme}-${tileRetryKey}`}
           attribution={themes[currentTheme].attribution}
           url={themes[currentTheme].url}
+          eventHandlers={{
+            tileerror: () => setTileErrorCount(prev => prev + 1),
+            tileload: () => {
+              if (tileErrorCount > 0) setTileErrorCount(0);
+            }
+          }}
         />
 
-        {/* Renderização dos marcadores circulares (bolinhas) filtrados */}
-        {filteredMarkers.map(marker => (
+        {mappableMarkers.map(({ service, modalData, coords }) => (
           <CircleMarker
-            key={marker.id}
-            center={marker.coords}
+            key={service.id}
+            center={coords}
             pathOptions={{
-              color: getMarkerColor(marker.status),
-              fillColor: getMarkerColor(marker.status),
+              color: getMarkerColor(modalData.status),
+              fillColor: getMarkerColor(modalData.status),
               fillOpacity: 0.8
             }}
             radius={14}
           >
-            <Tooltip>{marker.name} (Clique para abrir)</Tooltip>
-            {/* Modal Glassmorphism que abre ao clicar na bolinha */}
+            <Tooltip>{modalData.name} (Clique para abrir)</Tooltip>
             <Popup closeButton={false} offset={[0, -10]}>
-              <ServiceModal service={marker} />
+              <ServiceModal service={modalData} />
             </Popup>
           </CircleMarker>
         ))}
       </MapContainer>
 
       {/* =========================================================
-          COMPONENTE 3: BOTÃO MENU HAMBÚRGUER (Canto Superior Direito)
-         ========================================================= */}
-     {/* =========================================================
-          COMPONENTE 3: BOTÃO MENU HAMBÚRGUER (Canto Superior Direito)
+          AVISOS INFORMATIVOS NÃO-BLOQUEANTES DO MAPA (T25.3/US17 #102)
+          ========================================================= */}
+      <div
+        className={`pointer-events-none absolute top-20 sm:top-4 right-4 sm:right-20 z-[1000] flex flex-col items-center sm:items-end gap-2 transition-all duration-300 ${
+          isSidebarMinimized ? 'left-4 sm:left-[290px]' : 'left-4 sm:left-[452px]'
+        }`}
+      >
+        {/* 1. Carregamento inicial */}
+        {isInitialLoading && (
+          <div
+            role="status"
+            className="pointer-events-auto px-3.5 py-2 rounded-full bg-[#081C12]/90 backdrop-blur-xl border border-[#2FA862]/60 text-[#F2FAF5] text-[12px] sm:text-[13px] flex items-center gap-2 shadow-xl"
+          >
+            <span className="w-2.5 h-2.5 rounded-full bg-[#22D55B] animate-ping shrink-0" />
+            <span>Carregando serviços e marcadores no mapa...</span>
+          </div>
+        )}
+
+        {/* 2. Falha no carregamento do mapa ou da API */}
+        {(hasMapLayerFailure || hasError) && (
+          <div
+            role="alert"
+            className="pointer-events-auto max-w-md px-4 py-2.5 rounded-[14px] bg-[#240B0B]/92 backdrop-blur-xl border border-[#F34F0E]/80 text-[#F2FAF5] text-[12px] sm:text-[13px] flex items-center justify-between gap-3 shadow-2xl"
+          >
+            <div className="flex flex-col min-w-0">
+              <span className="font-semibold text-[#FCA5A5]">
+                {hasMapLayerFailure
+                  ? 'Falha ao carregar camadas do mapa'
+                  : 'Falha ao sincronizar serviços'}
+              </span>
+              <span className="text-[#F2FAF5]/85 text-[11px] sm:text-[12px]">
+                A lista de serviços e os dashboards continuam disponíveis normalmente.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleRetryMap}
+              className="px-3 py-1.5 rounded-[10px] bg-[#9C2A2A] hover:bg-[#B83232] text-white text-[12px] font-medium shrink-0 transition-colors cursor-pointer"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        )}
+
+        {/* 3. Aviso de serviços sem coordenadas disponíveis na lista */}
+        {!isInitialLoading && servicesWithoutCoordsCount > 0 && mappableMarkers.length > 0 && (
+          <div className="pointer-events-auto px-3.5 py-2 rounded-[12px] bg-[#081C12]/90 backdrop-blur-xl border border-amber-400/50 text-[#F2FAF5] text-[12px] flex items-center gap-2.5 shadow-xl">
+            <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+            <span>
+              {servicesWithoutCoordsCount}{' '}
+              {servicesWithoutCoordsCount === 1
+                ? 'serviço sem coordenadas no mapa'
+                : 'serviços sem coordenadas no mapa'}
+            </span>
+            <button
+              type="button"
+              onClick={handleOpenServicesList}
+              className="underline text-amber-300 hover:text-amber-200 font-medium cursor-pointer whitespace-nowrap"
+            >
+              Acessar na lista
+            </button>
+          </div>
+        )}
+
+        {/* 4. Ausência total de marcadores no mapa (por filtro ou falta de coordenadas) */}
+        {showEmptyMarkersBanner && (
+          <div
+            role="status"
+            className="pointer-events-auto max-w-md px-4 py-3 rounded-[16px] bg-[#081C12]/92 backdrop-blur-xl border border-[#F2FAF5]/40 text-[#F2FAF5] text-[12px] sm:text-[13px] flex flex-col gap-2 shadow-2xl"
+          >
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" />
+              <span className="font-semibold">
+                {services.length === 0
+                  ? 'Nenhum serviço disponível no momento'
+                  : filteredServices.length === 0
+                  ? 'Nenhum marcador corresponde aos filtros selecionados'
+                  : 'Nenhum serviço filtrado possui coordenadas para exibição no mapa'}
+              </span>
+            </div>
+            <p className="text-[#DDF1E5]/85 text-[11px] sm:text-[12px] leading-relaxed">
+              {filteredServices.length > 0
+                ? `Há ${filteredServices.length} ${
+                    filteredServices.length === 1 ? 'serviço disponível' : 'serviços disponíveis'
+                  } para consulta na lista lateral e nos dashboards.`
+                : 'Ajuste os filtros de status ou consulte os demais painéis pelo menu.'}
+            </p>
+            <div className="flex items-center gap-2 pt-0.5 flex-wrap">
+              {filteredServices.length === 0 && services.length > 0 && (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="px-3 py-1.5 rounded-[10px] bg-[#1F8A4C] hover:bg-[#2FA862] text-white text-[12px] font-medium transition-colors cursor-pointer"
+                >
+                  Restaurar filtros
+                </button>
+              )}
+              {filteredServices.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleOpenServicesList}
+                  className="px-3 py-1.5 rounded-[10px] bg-[#1F8A4C] hover:bg-[#2FA862] text-white text-[12px] font-medium transition-colors cursor-pointer"
+                >
+                  Abrir lista de serviços ({filteredServices.length})
+                </button>
+              )}
+              {onSelectTab && (
+                <button
+                  type="button"
+                  onClick={() => onSelectTab('dashboards')}
+                  className="px-3 py-1.5 rounded-[10px] bg-[#F2FAF5]/15 hover:bg-[#F2FAF5]/25 border border-[#F2FAF5]/30 text-[#F2FAF5] text-[12px] font-medium transition-colors cursor-pointer"
+                >
+                  Ir para Dashboards
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* =========================================================
+          MODAL DE DETALHES PARA SERVIÇOS SELECIONADOS PELA LISTA
+          (Garante acesso total mesmo sem coordenadas no mapa)
+          ========================================================= */}
+      {selectedListService && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Detalhes de ${selectedListService.nome}`}
+          onClick={() => setSelectedListService(null)}
+          className="fixed inset-0 z-[1050] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="relative flex flex-col items-end gap-2"
+          >
+            <button
+              type="button"
+              onClick={() => setSelectedListService(null)}
+              aria-label="Fechar detalhes do serviço"
+              className="px-3 py-1 rounded-full bg-[#081C12] border border-[#F2FAF5]/50 text-[#F2FAF5] text-[12px] hover:bg-[#1F8A4C] transition-colors cursor-pointer"
+            >
+              Fechar ✕
+            </button>
+            <ServiceModal service={toModalServiceData(selectedListService)} />
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================
+          BOTÃO VOLTAR CIRCULAR MOBILE - Canto Superior Esquerdo
           ========================================================= */}
       <button
         type="button"
-        title="Menu"
-        className="absolute top-4 right-4 z-[1000] w-[52px] h-[52px] rounded-full bg-[#0E3B25]/25 hover:bg-[#0E3B25]/45 backdrop-blur-xl border-l border-t border-[#F2FAF5] flex items-center justify-center text-[#F2FAF5] transition-all shadow-[inset_-4px_-4px_10px_rgba(14,59,37,0.35),0_8px_20px_rgba(0,0,0,0.25)] cursor-pointer"
+        onClick={handleMobileBackClick}
+        title={mobileSheetView === 'list' ? 'Voltar aos filtros' : 'Alternar painel'}
+        className="flex sm:hidden absolute top-4 left-4 z-[1001] w-[52px] h-[52px] rounded-full bg-[#0E3B25]/25 hover:bg-[#0E3B25]/45 backdrop-blur-xl border-l border-t border-[#F2FAF5] items-center justify-center text-[#F2FAF5] transition-all shadow-[inset_-4px_-4px_10px_rgba(14,59,37,0.35),0_8px_20px_rgba(0,0,0,0.25)] cursor-pointer"
       >
-        <svg
-          className="w-[26px] h-[26px]"
-          viewBox="0 0 40 40"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
+        <svg className="w-[24px] h-[24px]" viewBox="0 0 24 24" fill="none">
           <path
-            d="M7 10H33M7 20H33M7 30H33"
+            d="M15 6L9 12L15 18"
             stroke="#F2FAF5"
-            strokeWidth="6.5"
+            strokeWidth="3"
             strokeLinecap="round"
+            strokeLinejoin="round"
           />
         </svg>
       </button>
 
       {/* =========================================================
+          COMPONENTE 3: BOTÃO MENU HAMBÚRGUER + DROPDOWN (Glassmorphism)
+          ========================================================= */}
+      <div
+        ref={menuContainerRef}
+        translate="no"
+        className="notranslate absolute top-4 right-4 z-[1001] flex flex-col items-end"
+      >
+        <button
+          type="button"
+          onClick={() => setIsMenuOpen(prev => !prev)}
+          aria-expanded={isMenuOpen}
+          title="Menu"
+          className="w-[52px] h-[52px] rounded-full bg-[#0E3B25]/25 hover:bg-[#0E3B25]/45 backdrop-blur-xl border-l border-t border-[#F2FAF5] flex items-center justify-center text-[#F2FAF5] transition-all shadow-[inset_-4px_-4px_10px_rgba(14,59,37,0.35),0_8px_20px_rgba(0,0,0,0.25)] cursor-pointer"
+        >
+          {isMenuOpen ? (
+            <svg className="w-[24px] h-[24px]" viewBox="0 0 24 24" fill="none">
+              <path d="M6 6L18 18M18 6L6 18" stroke="#F2FAF5" strokeWidth="3.2" strokeLinecap="round" />
+            </svg>
+          ) : (
+            <svg className="w-[26px] h-[26px]" viewBox="0 0 40 40" fill="none">
+              <path d="M7 10H33M7 20H33M7 30H33" stroke="#F2FAF5" strokeWidth="6.5" strokeLinecap="round" />
+            </svg>
+          )}
+        </button>
+
+        {isMenuOpen && (
+          <nav
+            aria-label="Menu de navegação"
+            className="mt-2.5 w-[210px] p-[14px] bg-[#0E3B25]/25 backdrop-blur-xl overflow-hidden rounded-tl-[20px] rounded-tr-none rounded-br-[20px] rounded-bl-[20px] border-l border-b border-[#F2FAF5] shadow-[inset_-4px_-4px_12px_rgba(14,59,37,0.35),0_12px_28px_rgba(0,0,0,0.35)] inline-flex flex-col justify-start items-start gap-[9px]"
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setIsMenuOpen(false);
+                onSelectTab?.('historico');
+              }}
+              className="self-stretch p-[10px] overflow-hidden rounded-[50px] border border-transparent border-b-[#F2FAF5] hover:border-[#F2FAF5] hover:bg-[#F2FAF5]/10 flex justify-start items-center gap-[10px] text-[#F2FAF5] text-[16px] font-normal leading-[24px] transition-all cursor-pointer"
+            >
+              <svg className="w-[25px] h-[25px] text-[#F2FAF5] shrink-0" viewBox="0 0 25 25" fill="none">
+                <path
+                  d="M3.125 12.5C3.125 17.6777 7.32233 21.875 12.5 21.875C17.6777 21.875 21.875 17.6777 21.875 12.5C21.875 7.32233 17.6777 3.125 12.5 3.125C9.04822 3.125 6.03326 4.99124 4.4126 7.77083M3.125 4.16667V8.33333H7.29167M12.5 7.8125V12.5L15.625 14.5833"
+                  stroke="currentColor"
+                  strokeWidth="2.08"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span>Histórico</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsMenuOpen(false);
+                onSelectTab?.('dashboards');
+              }}
+              className="self-stretch p-[10px] overflow-hidden rounded-[50px] border border-transparent border-b-[#F2FAF5] hover:border-[#F2FAF5] hover:bg-[#F2FAF5]/10 flex justify-start items-center gap-[6px] text-white text-[16px] font-normal leading-[24px] transition-all cursor-pointer"
+            >
+              <svg className="w-[25px] h-[25px] text-[#F2FAF5] shrink-0" viewBox="0 0 25 25" fill="currentColor">
+                <rect x="3.13" y="16.67" width="5.21" height="5.21" rx="1.5" />
+                <rect x="9.90" y="9.38" width="5.21" height="12.50" rx="1.5" />
+                <rect x="16.67" y="3.13" width="5.21" height="18.75" rx="1.5" />
+              </svg>
+              <span>Dashboards</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsMenuOpen(false);
+                onSelectTab?.('config');
+              }}
+              className="self-stretch p-[10px] overflow-hidden rounded-[50px] border border-transparent border-b-[#F2FAF5] hover:border-[#F2FAF5] hover:bg-[#F2FAF5]/10 flex justify-start items-center gap-[6px] text-[#F2FAF5] text-[16px] font-normal leading-[24px] text-left transition-all cursor-pointer"
+            >
+              <svg className="w-[25px] h-[25px] text-[#F2FAF5] shrink-0" viewBox="0 0 25 25" fill="none">
+                <path
+                  d="M12.5 2.6L20.8 7.4V17.6L12.5 22.4L4.2 17.6V7.4L12.5 2.6Z"
+                  stroke="currentColor"
+                  strokeWidth="2.08"
+                  strokeLinejoin="round"
+                />
+                <circle cx="12.5" cy="12.5" r="3.2" stroke="currentColor" strokeWidth="2.08" />
+              </svg>
+              <span className="flex-1">Configurações</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsMenuOpen(false);
+                onLogout?.();
+              }}
+              className="group self-stretch px-[10px] py-[6px] bg-[#FB0B0B]/20 hover:bg-[#FB0B0B] overflow-hidden rounded-[50px] border border-[#FB0B0B] flex justify-start items-center gap-[10px] text-[#F2FAF5] hover:text-black text-[16px] font-normal leading-[24px] text-left transition-all cursor-pointer"
+            >
+              <svg
+                className="w-[25px] h-[25px] text-[#FC8080] group-hover:text-black shrink-0 transition-colors"
+                viewBox="0 0 25 25"
+                fill="none"
+              >
+                <path
+                  d="M12.5 3.125H18.75C19.3025 3.125 19.8324 3.34449 20.2231 3.73519C20.6138 4.12589 20.8333 4.6558 20.8333 5.20833V19.7917C20.8333 20.3442 20.6138 20.8741 20.2231 21.2648C19.8324 21.6555 19.3025 21.875 18.75 21.875H12.5M8.33333 17.7083L3.125 12.5M3.125 12.5L8.33333 7.29167M3.125 12.5H15.625"
+                  stroke="currentColor"
+                  strokeWidth="2.08"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span className="flex-1">Sair</span>
+            </button>
+          </nav>
+        )}
+      </div>
+
+      {/* =========================================================
           COMPONENTE 4: MINIATURA ALTERNADORA ESCURO / SATÉLITE
-          Canto Inferior Esquerdo - 100x100px fiel ao código do Figma.
-          Desliza automaticamente quando a Sidebar é minimizada ou expandida.
-         ========================================================= */}
+          ========================================================= */}
       <button
         type="button"
         onClick={toggleTheme}
         title={currentTheme === 'dark' ? 'Mudar para Satélite' : 'Mudar para Escuro'}
-        className={`group absolute bottom-4 z-[1000] w-[100px] h-[100px] rounded-[6px] overflow-hidden border border-neutro-50 shadow-2xl transition-all duration-300 cursor-pointer ${
-          isSidebarMinimized ? 'left-4' : 'left-[452px]'
+        className={`group absolute ${mobileFloatingBottomClass} sm:bottom-4 left-4 z-[1000] w-[72px] h-[72px] sm:w-[100px] sm:h-[100px] rounded-[6px] overflow-hidden border border-neutro-50 shadow-2xl transition-all duration-300 cursor-pointer ${
+          isSidebarMinimized ? 'sm:left-4' : 'sm:left-[452px]'
         }`}
       >
-        {/* Imagem de fundo mostrando a prévia do outro tema */}
         <img
           src={currentTheme === 'dark' ? previewTiles.satellite : previewTiles.dark}
           alt={currentTheme === 'dark' ? 'Prévia Satélite' : 'Prévia Escuro'}
@@ -205,10 +677,9 @@ export const MapBackground: React.FC = () => {
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
         />
 
-        {/* Selo circular de 20x20px com ícone de camadas (left: 76px, top: 76px) */}
-        <div className="w-[20px] h-[20px] left-[76px] top-[76px] absolute bg-[#DDF1E5]/20 backdrop-blur-xs rounded-[22px] border border-verde-50 flex items-center justify-center overflow-hidden">
+        <div className="w-[18px] h-[18px] sm:w-[20px] sm:h-[20px] right-[4px] bottom-[4px] absolute bg-[#DDF1E5]/20 backdrop-blur-xs rounded-[22px] border border-verde-50 flex items-center justify-center overflow-hidden">
           <svg
-            className="w-[15px] h-[15px] text-neutro-50 shrink-0"
+            className="w-[13px] h-[13px] sm:w-[15px] sm:h-[15px] text-neutro-50 shrink-0"
             viewBox="0 0 24 24"
             fill="currentColor"
           >
@@ -219,23 +690,17 @@ export const MapBackground: React.FC = () => {
 
       {/* =========================================================
           COMPONENTE 5: CONTROLE DE ZOOM CUSTOMIZADO (- | +)
-          Canto Inferior Direito com lupas de diminuir e aumentar zoom
           ========================================================= */}
-      <div className="absolute bottom-4 right-4 z-[1000] px-[15px] py-[10px] bg-[#06401D]/25 backdrop-blur-xl overflow-hidden rounded-[35px] border-l border-t border-[#F2FAF5]/60 shadow-[inset_-4px_-4px_10px_rgba(6,64,29,0.35),0_8px_20px_rgba(0,0,0,0.25)] inline-flex justify-start items-center gap-[10px]">
-        {/* Botão Zoom Out (-) */}
+      <div
+        className={`absolute ${mobileFloatingBottomClass} sm:bottom-4 right-4 z-[1000] px-[12px] py-[8px] sm:px-[15px] sm:py-[10px] bg-[#06401D]/25 backdrop-blur-xl overflow-hidden rounded-[35px] border-l border-t border-[#F2FAF5]/60 shadow-[inset_-4px_-4px_10px_rgba(6,64,29,0.35),0_8px_20px_rgba(0,0,0,0.25)] inline-flex justify-start items-center gap-[8px] sm:gap-[10px] transition-all duration-300`}
+      >
         <button
           type="button"
           onClick={() => mapInstance?.zoomOut()}
-          className="w-[30px] h-[30px] relative overflow-hidden flex items-center justify-center hover:scale-105 active:scale-95 transition-transform cursor-pointer"
+          className="w-[26px] h-[26px] sm:w-[30px] sm:h-[30px] relative overflow-hidden flex items-center justify-center hover:scale-105 active:scale-95 transition-transform cursor-pointer"
           title="Diminuir zoom"
         >
-          <svg
-            width="27"
-            height="27"
-            viewBox="0 0 27 27"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
+          <svg width="27" height="27" viewBox="0 0 27 27" fill="none" className="w-[22px] h-[22px] sm:w-[27px] sm:h-[27px]">
             <path
               d="M25 25L19.393 19.383M19.393 19.383L19.3925 19.3825M19.393 19.383C21.3825 17.3909 22.5 14.6906 22.5 11.875C22.5 9.05707 21.3806 6.35456 19.388 4.36199C17.3954 2.36942 14.6929 1.25 11.875 1.25C9.05707 1.25 6.35456 2.36942 4.36199 4.36199C2.36942 6.35456 1.25 9.05707 1.25 11.875C1.25 14.6929 2.36942 17.3954 4.36199 19.388C6.35456 21.3806 9.05707 22.5 11.875 22.5C14.6929 22.5 17.3954 21.3806 19.388 19.388C19.3897 19.3863 19.3913 19.3847 19.393 19.383ZM15 11.875H8.75"
               stroke="#F2FAF5"
@@ -245,23 +710,15 @@ export const MapBackground: React.FC = () => {
           </svg>
         </button>
 
-        {/* Linha divisória vertical (2px de largura e pontas arredondadas) */}
         <div className="w-[2px] self-stretch bg-[#F2FAF5] rounded-[10px]" />
 
-        {/* Botão Zoom In (+) */}
         <button
           type="button"
           onClick={() => mapInstance?.zoomIn()}
-          className="w-[30px] h-[30px] relative overflow-hidden flex items-center justify-center hover:scale-105 active:scale-95 transition-transform cursor-pointer"
+          className="w-[26px] h-[26px] sm:w-[30px] sm:h-[30px] relative overflow-hidden flex items-center justify-center hover:scale-105 active:scale-95 transition-transform cursor-pointer"
           title="Aumentar zoom"
         >
-          <svg
-            width="27"
-            height="27"
-            viewBox="0 0 27 27"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
+          <svg width="27" height="27" viewBox="0 0 27 27" fill="none" className="w-[22px] h-[22px] sm:w-[27px] sm:h-[27px]">
             <path
               d="M25 25L19.393 19.383M19.393 19.383L19.3925 19.3825M19.393 19.383C21.3825 17.3909 22.5 14.6906 22.5 11.875C22.5 9.05707 21.3806 6.35456 19.388 4.36199C17.3954 2.36942 14.6929 1.25 11.875 1.25C9.05707 1.25 6.35456 2.36942 4.36199 4.36199C2.36942 6.35456 1.25 9.05707 1.25 11.875C1.25 14.6929 2.36942 17.3954 4.36199 19.388C6.35456 21.3806 9.05707 22.5 11.875 22.5C14.6929 22.5 17.3954 21.3806 19.388 19.388C19.3897 19.3863 19.3913 19.3847 19.393 19.383ZM11.875 7.5V11.875M11.875 11.875V16.25M11.875 11.875H16.25M11.875 11.875H7.5"
               stroke="#F2FAF5"
@@ -271,7 +728,6 @@ export const MapBackground: React.FC = () => {
           </svg>
         </button>
       </div>
-
     </div>
   );
 };

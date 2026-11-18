@@ -39,7 +39,7 @@ A porta do PostgreSQL no host é `5433`. Entre containers, a API usa `postgres:5
 
 **Se o Swagger abrir e o dashboard responder HTTP 500**, confira se as migrações foram aplicadas. Em um volume novo sem tabelas, os três containers chegaram a subir e o PostgreSQL ficou saudável. A consulta do dashboard falhou com `relation "servidores" does not exist`. Nesse caso, execute a etapa 3 e reinicie o backend com `docker compose restart backend`.
 
-O Compose atual ainda usa a configuração JWT padrão do backend, e o código cria um administrador inicial com credencial fixa registrada no log. A demonstração deve ficar em ambiente local controlado enquanto essa pendência estiver aberta. [Issue de segurança #138](https://github.com/404NotFound-ABP/greener/issues/138)
+
 
 ## Documentação
 
