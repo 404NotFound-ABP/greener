@@ -88,7 +88,7 @@ export const Login: React.FC<LoginProps> = ({
           <div className="w-full flex flex-row justify-between items-center gap-4">
             <button
               type="button"
-              onClick={onGoTaskRegister => onGoToRegister?.()}
+              onClick={() => onGoToRegister?.()}
               className="h-[48px] px-[28px] bg-white/[0.03] hover:bg-white/[0.1] rounded-[10px] border border-[#14C45A] flex justify-center items-center text-white text-[16px] font-medium leading-[24px] transition-colors cursor-pointer"
             >
               Cadastro
