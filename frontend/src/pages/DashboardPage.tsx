@@ -2550,7 +2550,10 @@ export const DashboardPage: React.FC = () => {
 
             </button>
 
-            <ServiceModal service={selectedServiceModal} />
+            <ServiceModal
+              service={selectedServiceModal}
+              onClose={() => setSelectedServiceModal(null)}
+            />
 
           </div>
 

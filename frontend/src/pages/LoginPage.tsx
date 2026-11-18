@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { OrbitsBackground } from '../components/auth/OrbitsBackground';
 import { GreenerGlobeLogo } from '../components/auth/GreenerGlobeLogo';
 
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api').replace(/\/$/, '');
+
 interface LoginProps {
   onLoginSuccess?: () => void;
   onGoToRegister?: () => void;
@@ -15,10 +17,43 @@ export const Login: React.FC<LoginProps> = ({
 }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [erro, setErro] = useState('');
+  const [carregando, setCarregando] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onLoginSuccess?.();
+    setCarregando(true);
+    setErro('');
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      if (!response.ok) {
+        setErro(response.status === 401 ? 'E-mail ou senha inválidos.' : `Falha ao autenticar (HTTP ${response.status}).`);
+        return;
+      }
+
+      const payload: unknown = await response.json();
+      if (
+        !payload ||
+        typeof payload !== 'object' ||
+        !('accessToken' in payload) ||
+        typeof payload.accessToken !== 'string' ||
+        !payload.accessToken
+      ) {
+        throw new Error('A resposta de autenticação não contém um token válido.');
+      }
+
+      sessionStorage.setItem('accessToken', payload.accessToken);
+      onLoginSuccess?.();
+    } catch (error) {
+      setErro(error instanceof Error ? error.message : 'Não foi possível conectar ao serviço de autenticação.');
+    } finally {
+      setCarregando(false);
+    }
   };
 
   return (
@@ -90,11 +125,14 @@ export const Login: React.FC<LoginProps> = ({
 
             <button
               type="submit"
-              className="h-[48px] px-[28px] bg-[#2FA862] hover:bg-[#14C45A] rounded-[10px] flex justify-center items-center text-white text-[16px] font-medium leading-[24px] transition-colors cursor-pointer shadow-lg"
+              disabled={carregando}
+              className="h-[48px] px-[28px] bg-[#2FA862] hover:bg-[#14C45A] rounded-[10px] flex justify-center items-center text-white text-[16px] font-medium leading-[24px] transition-colors cursor-pointer shadow-lg disabled:cursor-wait disabled:opacity-60"
             >
-              Login
+              {carregando ? 'Entrando...' : 'Login'}
             </button>
           </div>
+
+          {erro && <p role="alert" className="text-center text-sm text-red-200">{erro}</p>}
 
           {/* Acesso Administrativo */}
           <button

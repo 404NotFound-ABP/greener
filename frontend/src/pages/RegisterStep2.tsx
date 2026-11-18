@@ -95,6 +95,7 @@ export const RegisterStep2: React.FC<RegisterStep2Props> = ({ onNextStep }) => {
   const [tempoAtualizacao, setTempoAtualizacao] = useState('');
   const [localizacao, setLocalizacao] = useState('');
   const [openDropdown, setOpenDropdown] = useState<'tempo' | 'local' | null>(null);
+  const [erroPreferencias, setErroPreferencias] = useState(false);
 
   const tempoOptions = [
     { label: 'Minutos', value: 'minutos' },
@@ -110,6 +111,11 @@ export const RegisterStep2: React.FC<RegisterStep2Props> = ({ onNextStep }) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!tempoAtualizacao || !localizacao) {
+      setErroPreferencias(true);
+      return;
+    }
+    setErroPreferencias(false);
     onNextStep?.();
   };
 
@@ -192,6 +198,12 @@ export const RegisterStep2: React.FC<RegisterStep2Props> = ({ onNextStep }) => {
               onToggle={() => setOpenDropdown(openDropdown === 'local' ? null : 'local')}
             />
           </div>
+
+          {erroPreferencias && (
+            <p role="alert" className="text-sm text-red-200">
+              Selecione o tempo de atualização e a localização para continuar.
+            </p>
+          )}
 
           <div className="w-full flex justify-end mt-[8px]">
             <button

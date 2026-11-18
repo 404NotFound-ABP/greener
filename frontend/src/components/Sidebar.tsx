@@ -11,7 +11,7 @@ import {
   type ServiceRepository
 } from '../adapters/serviceAdapter';
 import { useServicesPolling } from '../hooks/useServicesPolling';
-import { extractValidCoordinates, formatServiceLocation } from './MapBackground';
+import { extractValidCoordinates, formatServiceLocation } from './mapServiceUtils';
 
 export type MobileSheetView = 'filters' | 'list' | 'collapsed';
 
@@ -32,6 +32,8 @@ export interface SidebarProps {
   onFetchServices?: () => Promise<ServiceData[]>;
   pollingState?: ReturnType<typeof useServicesPolling>;
   onSelectService?: (service: ServiceData) => void;
+  hiddenServiceIds?: ReadonlySet<string>;
+  onToggleServiceMarker?: (service: ServiceData) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -45,7 +47,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   repository,
   onFetchServices,
   pollingState,
-  onSelectService
+  onSelectService,
+  hiddenServiceIds,
+  onToggleServiceMarker
 }) => {
   const [internalSheetView, setInternalSheetView] = useState<MobileSheetView>('filters');
   const currentSheetView = mobileSheetView ?? internalSheetView;
@@ -136,7 +140,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         onClick={() => onSelectService?.(service)}
         className={`self-stretch flex flex-col gap-1 ${onSelectService ? 'cursor-pointer' : ''}`}
       >
-        <ServiceCard service={service} />
+        <ServiceCard
+          service={service}
+          markerVisible={!hiddenServiceIds?.has(service.id)}
+          onToggleMarker={() => onToggleServiceMarker?.(service)}
+        />
 
         {/* Indicadores explícitos para localização incompleta (#96) ou ausência de coordenadas (#102) */}
         {(locationInfo.isIncomplete || !hasCoords) && (

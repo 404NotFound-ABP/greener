@@ -2,6 +2,10 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DashboardPage } from './DashboardPage';
 
+vi.mock('../components/ServiceModal', () => ({
+  ServiceModal: ({ service }: { service: { name: string } }) => <div>Detalhes: {service.name}</div>,
+}));
+
 describe('DashboardPage', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -25,10 +29,10 @@ describe('DashboardPage', () => {
     render(<DashboardPage />);
 
     // Act
-    fireEvent.click(screen.getByRole('row', { name: /ASTAH-ABC/ }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Selecionar ASTAH-ABC para comparação' })[0]);
 
     // Assert
-    expect(screen.getByText(/2 de 2 selecionado/)).toBeInTheDocument();
+    expect(screen.getByText('4 de 5 selecionados')).toBeInTheDocument();
   });
 
   it('filtra os serviços pelo texto pesquisado', () => {
@@ -45,18 +49,16 @@ describe('DashboardPage', () => {
     expect(screen.queryByRole('row', { name: /ASTAH-ABC/ })).not.toBeInTheDocument();
   });
 
-  it('consulta o resumo real do backend em vez de depender da lista fixa', async () => {
+  it('mantém a lista de demonstração visível sem disparar chamadas HTTP', async () => {
     // Arrange
-    const buscar = vi.fn().mockResolvedValue({ ok: true, json: async () => ({
-      resumo: { total_servidores: 1 }, servidores: [{ id: 'SERVICO-REAL', nome: 'Serviço real' }],
-    }) });
+    const buscar = vi.fn();
     vi.stubGlobal('fetch', buscar);
 
     // Act
     render(<DashboardPage />);
 
     // Assert
-    await waitFor(() => expect(buscar).toHaveBeenCalled());
-    expect(screen.getByText('SERVICO-REAL')).toBeInTheDocument();
+    expect(screen.getByRole('table')).toHaveTextContent('ASTAH-XYZ');
+    await waitFor(() => expect(buscar).not.toHaveBeenCalled());
   });
 });

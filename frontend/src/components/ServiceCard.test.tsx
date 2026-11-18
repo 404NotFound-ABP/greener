@@ -1,39 +1,40 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ServiceCard } from './ServiceCard';
+import type { ServiceData } from '../types/service';
 
-const servico = {
-  id: 1,
-  name: 'Servidor Jacareí',
-  isActive: true,
-  location: { country: 'Brasil', region: 'Sudeste', city: 'Jacareí' },
-  metrics: { kwh: 0.25, co2: '100 gCO₂e' },
+const servico: ServiceData = {
+  id: '1',
+  nome: 'Servidor Jacareí',
+  status: 'Ativo',
+  localizacao: { pais: 'Brasil', regiao: 'Sudeste', cidade: 'Jacareí' },
+  valores: { kwh: 0.25, gco2e: 100 },
 };
 
 describe('ServiceCard', () => {
   it('mostra nome, estado, localização e indicadores com unidades', () => {
     // Arrange
-    render(<ServiceCard data={servico} />);
+    render(<ServiceCard service={servico} />);
 
     // Act
-    const nome = screen.getByText('Servidor Jacareí');
+    const nomes = screen.getAllByText('Servidor Jacareí');
 
     // Assert
-    expect(nome).toBeInTheDocument();
-    expect(screen.getByText(/Ativo/)).toBeInTheDocument();
+    expect(nomes.length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Ativo/).length).toBeGreaterThan(0);
     expect(screen.getByText('Cidade: Jacareí')).toBeInTheDocument();
-    expect(screen.getByText('0.25 kWh')).toBeInTheDocument();
-    expect(screen.getByText('100 gCO₂e')).toBeInTheDocument();
+    expect(screen.getAllByText('0,25 kWh').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('100 gCO₂e').length).toBeGreaterThan(0);
   });
 
   it('mostra estado indisponível quando o serviço não está ativo', () => {
     // Arrange
-    render(<ServiceCard data={{ ...servico, isActive: false }} />);
+    render(<ServiceCard service={{ ...servico, status: 'Indisponível' }} />);
 
     // Act
-    const estado = screen.getByText(/Indisponível/);
+    const estados = screen.getAllByText(/Indisponível/);
 
     // Assert
-    expect(estado).toBeInTheDocument();
+    expect(estados.length).toBeGreaterThan(0);
   });
 });

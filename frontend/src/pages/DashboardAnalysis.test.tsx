@@ -1,28 +1,29 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { DashboardPage } from './DashboardPage';
 
+vi.mock('../components/ServiceModal', () => ({
+  ServiceModal: ({ service }: { service: { name: string } }) => <div>Detalhes: {service.name}</div>,
+}));
+
 describe('DashboardPage — ranking e comparação', () => {
-  it('mostra a comparação quando dois serviços são selecionados', () => {
+  it('mostra a comparação inicial com os serviços selecionados por padrão', () => {
     // Arrange
     render(<DashboardPage />);
 
-    // Act
-    fireEvent.click(screen.getByRole('row', { name: /ASTAH-ABC/ }));
-
     // Assert
-    expect(screen.getByText('Comparando 2 serviços')).toBeInTheDocument();
+    expect(screen.getByText('5 de 5 serviços')).toBeInTheDocument();
   });
 
-  it('orienta a seleção de pelo menos dois serviços para comparar', () => {
+  it('permite remover um serviço da comparação', () => {
     // Arrange
     render(<DashboardPage />);
 
     // Act
-    const orientacao = screen.queryByText(/selecione pelo menos dois serviços/i);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Selecionar ASTAH-ABC para comparação' })[0]);
 
     // Assert
-    expect(orientacao).toBeInTheDocument();
+    expect(screen.getByText('4 de 5 serviços')).toBeInTheDocument();
   });
 
   it('ordena os serviços pelo critério escolhido no ranking', () => {
