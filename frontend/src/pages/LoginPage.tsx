@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { OrbitsBackground } from '../components/auth/OrbitsBackground';
 import { GreenerGlobeLogo } from '../components/auth/GreenerGlobeLogo';
-import { SocialAuthButtons } from '../components/auth/SocialAuthButtons';
 
 interface LoginProps {
   onLoginSuccess?: () => void;
@@ -24,14 +23,12 @@ export const Login: React.FC<LoginProps> = ({
 
   return (
     <div className="relative min-h-screen w-full bg-[#07150E] overflow-hidden flex items-center justify-center px-4 py-6 font-sans select-none">
-      
       {/* 
         Container do Conjunto (Órbitas + Logo + Card)
         - Ajustado com scale progressivo para que em monitores grandes e notebooks as órbitas 
           fiquem totalmente contidas na tela, sem cortar o planeta laranja ou o topo.
       */}
       <div className="relative w-full max-w-[600px] mt-[120px] mb-[20px] scale-[0.72] sm:scale-[0.78] lg:scale-[0.82] xl:scale-[0.84] 2xl:scale-[0.88] origin-center transition-transform duration-300">
-        
         {/* 1. ÓRBITAS: Ancoradas a -241px do topo do Card */}
         <div className="absolute left-1/2 -translate-x-1/2 -top-[241px] w-[1440px] h-[1024px] pointer-events-none z-0">
           <OrbitsBackground />
@@ -45,7 +42,7 @@ export const Login: React.FC<LoginProps> = ({
         {/* 3. CARD DE LOGIN (Medidas exatas do Figma) */}
         <form
           onSubmit={handleSubmit}
-          className="relative z-10 w-full pt-[165px] pb-[32px] px-[30px] bg-[rgba(242,250,245,0.12)] shadow-[0px_24px_48px_rgba(21,32,26,0.25),inset_0px_4px_4px_rgba(242,250,245,0.10)] rounded-[24px] border-t border-r border-[rgba(242,250,245,0.50)] backdrop-blur-[8px] flex flex-col gap-[24px]"
+          className="relative z-10 w-full pt-[165px] pb-[36px] px-[30px] bg-[rgba(242,250,245,0.12)] shadow-[0px_24px_48px_rgba(21,32,26,0.25),inset_0px_4px_4px_rgba(242,250,245,0.10)] rounded-[24px] border-t border-r border-[rgba(242,250,245,0.50)] backdrop-blur-[8px] flex flex-col gap-[24px]"
         >
           {/* Cabeçalho do Formulário */}
           <div className="w-full flex flex-col gap-[5px] text-center">
@@ -77,15 +74,12 @@ export const Login: React.FC<LoginProps> = ({
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Senha"
               required
-              className="w-full bg-transparent text-[#F2FAF5] placeholder-[#F2FAF5] text-[16px] font-normal leading-[24px] outline-none"
+              className="w-full bg-transparent text-[#F7F7F5] placeholder-[#F7F7F5] text-[16px] font-normal leading-[24px] outline-none"
             />
           </div>
 
-          {/* Botões Sociais */}
-          <SocialAuthButtons />
-
           {/* Ações Principais: Cadastro e Login */}
-          <div className="w-full flex flex-row justify-between items-center gap-4">
+          <div className="w-full mt-[8px] flex flex-row justify-between items-center gap-4">
             <button
               type="button"
               onClick={() => onGoToRegister?.()}
@@ -111,7 +105,6 @@ export const Login: React.FC<LoginProps> = ({
             Acesso administrativo
           </button>
         </form>
-
       </div>
     </div>
   );
