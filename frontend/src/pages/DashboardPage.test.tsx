@@ -61,4 +61,23 @@ describe('DashboardPage', () => {
     expect(screen.getByRole('table')).toHaveTextContent('ASTAH-XYZ');
     await waitFor(() => expect(buscar).not.toHaveBeenCalled());
   });
+
+  it('abre e fecha a página de comparação de serviços', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve([{ id: 'api-a', nome: 'Serviço A' }])
+        })
+      )
+    );
+    render(<DashboardPage />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Comparar serviços' }));
+
+    expect(await screen.findByRole('heading', { name: 'Comparação de serviços' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Voltar aos dashboards' }));
+    expect(screen.getByRole('heading', { name: 'Dashboards' })).toBeInTheDocument();
+  });
 });

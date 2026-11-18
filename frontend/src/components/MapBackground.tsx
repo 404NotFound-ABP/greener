@@ -41,28 +41,6 @@ const themes = {
 const MAP_CENTER: [number, number] = [-23.3053, -45.9658];
 const MAP_ZOOM = 13;
 
-<<<<<<< HEAD
-/**
-- Extrai e valida coordenadas de múltiplos formatos possíveis vindos da API.
-- Retorna null quando ausentes, nulas, vazias ou fora da faixa geográfica válida.
- */
-export function extractValidCoordinates(service: ServiceData): [number, number] | null {
-  const raw = service as ServiceData & {
-    coordenadas?:
-      | {
-          lat?: number | null;
-          lng?: number | null;
-          latitude?: number | null;
-          longitude?: number | null;
-        }
-      | [number, number]
-      | null;
-    coords?: [number, number] | null;
-    latitude?: number | null;
-    longitude?: number | null;
-    lat?: number | null;
-    lng?: number | null;
-=======
 function getPreviewTiles() {
   const [latitude, longitude] = MAP_CENTER;
   const tileCount = 2 ** MAP_ZOOM;
@@ -75,46 +53,10 @@ function getPreviewTiles() {
   return {
     satellite: `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${MAP_ZOOM}/${y}/${x}`,
     dark: `https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/${MAP_ZOOM}/${y}/${x}`
->>>>>>> 1ed85b635b2aaad3c273b4f0bcae2f96f0672b3a
   };
 }
 
-<<<<<<< HEAD
-/**
-- Formata a localização textual tratando ausência parcial ou total de cidade, região e país (T23.2/US10).
- */
-export function formatServiceLocation(localizacao?: {
-  cidade?: string | null;
-  regiao?: string | null;
-  pais?: string | null;
-} | null): { text: string; isIncomplete: boolean } {
-  const cidade = localizacao?.cidade?.trim() || '';
-  const regiao = localizacao?.regiao?.trim() || '';
-  const pais = localizacao?.pais?.trim() || '';
-
-  const parts = [cidade, regiao, pais].filter(Boolean);
-
-  if (parts.length === 0) {
-    return { text: 'Localização não informada', isIncomplete: true };
-  }
-
-  if (parts.length < 3) {
-    const missing: string[] = [];
-    if (!cidade) missing.push('cidade');
-    if (!regiao) missing.push('região');
-    if (!pais) missing.push('país');
-
-    return {
-      text: `${parts.join(', ')} (${missing.join('/')} não informado)`,
-      isIncomplete: true
-    };
-  }
-
-  return { text: parts.join(', '), isIncomplete: false };
-}
-=======
 const previewTiles = getPreviewTiles();
->>>>>>> 1ed85b635b2aaad3c273b4f0bcae2f96f0672b3a
 
 function mapStatusToModalStatus(status: string): ModalServiceData['status'] {
   const normalized = status?.toLowerCase().trim();
@@ -155,11 +97,8 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
   const [tileErrorCount, setTileErrorCount] = useState(0);
   const [tileRetryKey, setTileRetryKey] = useState(0);
   const [selectedListService, setSelectedListService] = useState<ServiceData | null>(null);
-<<<<<<< HEAD
   const [isEmptyBannerDismissed, setIsEmptyBannerDismissed] = useState(false);
-=======
   const [hiddenServiceIds, setHiddenServiceIds] = useState<Set<string>>(() => new Set());
->>>>>>> 1ed85b635b2aaad3c273b4f0bcae2f96f0672b3a
 
   const [activeFilters, setActiveFilters] = useState({
     ativo: true,

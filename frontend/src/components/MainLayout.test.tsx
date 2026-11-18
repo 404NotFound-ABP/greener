@@ -35,6 +35,7 @@ describe('navegação principal', () => {
   it('oferece configuração de intervalo de monitoramento', () => {
     render(<MainLayout />);
     fireEvent.click(screen.getByRole('button', { name: 'Abrir configuração do mapa' }));
+    fireEvent.click(screen.getByRole('button', { name: /gerenciamento de conta/i }));
 
     expect(screen.getByLabelText(/intervalo de monitoramento/i)).toBeInTheDocument();
   });

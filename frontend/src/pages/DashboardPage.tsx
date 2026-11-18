@@ -8,6 +8,7 @@ import { useServicesPolling } from '../hooks/useServicesPolling';
 
 import { PollingStatusBanner } from '../components/PollingStatusBanner';
 
+import { ServiceComparisonPage } from './ServiceComparisonPage';
 
 
 type ServiceStatus = 'Ativo' | 'Indisponível' | 'Sem métricas';
@@ -672,6 +673,8 @@ const DashboardStatusPill: React.FC<{ status: ServiceStatus }> = ({ status }) =>
 
 export const DashboardPage: React.FC = () => {
 
+  const [isComparingServices, setIsComparingServices] = useState(false);
+
   const [searchTerm, setSearchTerm] = useState('');
 
   const [countryFilter, setCountryFilter] = useState('');
@@ -1034,6 +1037,10 @@ export const DashboardPage: React.FC = () => {
 
   const maxVal = 60;
 
+  if (isComparingServices) {
+    return <ServiceComparisonPage onBack={() => setIsComparingServices(false)} />;
+  }
+
 
 
   return (
@@ -1047,6 +1054,14 @@ export const DashboardPage: React.FC = () => {
         <div>
 
           <h1 className="text-2xl sm:text-3xl font-bold mb-1 text-[#F2FAF5]">Dashboards</h1>
+
+          <button
+            type="button"
+            onClick={() => setIsComparingServices(true)}
+            className="mt-2 min-h-10 rounded-lg border border-[#2FA862] bg-[#1F8A4C]/30 px-3 py-2 text-sm font-semibold text-[#F2FAF5] transition-colors hover:bg-[#1F8A4C]/60"
+          >
+            Comparar serviços
+          </button>
 
           <h2 className="text-base sm:text-xl font-semibold mb-1.5 text-[#F2FAF5]">
 
