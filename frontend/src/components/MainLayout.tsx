@@ -3,6 +3,14 @@ import { MapPage } from '../pages/MapPage';
 import { DashboardPage } from '../pages/DashboardPage';
 import { HistoricoPage } from '../pages/HistoricoPage';
 import { AccountSettingsPage } from '../pages/AccountSettingsPage';
+import { ConfigPage } from '../pages/ConfigPage';
+import type { ConfigSectionId } from '../pages/ConfigPage';
+import { AccessibilitySettingsPage } from '../pages/AccessibilitySettingsPage';
+import { TimezoneSettingsPage } from '../pages/TimezoneSettingsPage';
+import { LocationSettingsPage } from '../pages/LocationSettingsPage';
+import { LanguageSettingsPage } from '../pages/LanguageSettingsPage';
+import { PrivacySecuritySettingsPage } from '../pages/PrivacySecuritySettingsPage';
+import { AboutSettingsPage } from '../pages/AboutSettingsPage';
 
 export type MainTab = 'mapa' | 'dashboards' | 'historico' | 'config';
 
@@ -72,20 +80,31 @@ const SettingsIcon: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' 
 
 export const MainLayout: React.FC = () => {
   const [activeTab, setActiveTab] = useState<MainTab>('mapa');
+  const [activeConfigSection, setActiveConfigSection] = useState<ConfigSectionId | null>(null);
+
+  const handleTabChange = (tab: MainTab) => {
+    setActiveTab(tab);
+    if (tab === 'config') {
+      setActiveConfigSection(null);
+    }
+  };
 
   if (activeTab === 'mapa') {
-    return <MapPage onSelectTab={setActiveTab} />;
+    return <MapPage onSelectTab={handleTabChange} />;
   }
 
   return (
     <div className="flex flex-col md:flex-row h-screen w-full bg-[#060D09] overflow-hidden font-sans">
-      {/* Navegação Desktop (Sidebar em pílula com tokens oficiais GreenER: verde/950, verde/900, verde/600 e verde/50) */}
-      <nav aria-label="Navegação principal" className="hidden md:flex w-[92px] bg-[#060D09] flex-col items-center py-6 z-50 shrink-0 border-r border-[#1A2E20]">
+      {/* Navegação Desktop */}
+      <nav
+        aria-label="Navegação principal"
+        className="hidden md:flex w-[92px] bg-[#060D09] flex-col items-center py-6 z-50 shrink-0 border-r border-[#1A2E20]"
+      >
         <div className="bg-[#063819] p-1.5 rounded-[38px] flex flex-col gap-1.5 shadow-2xl border border-[#0B4B24]">
           {/* Item 1: Mapa */}
           <button
             type="button"
-            onClick={() => setActiveTab('mapa')}
+            onClick={() => handleTabChange('mapa')}
             className="flex flex-col items-center justify-center w-[62px] h-[68px] rounded-t-[30px] rounded-b-[10px] transition-colors cursor-pointer bg-[#0B4B24] hover:bg-[#136331]"
           >
             <div className="w-[30px] h-[30px] bg-white rounded-full flex items-center justify-center mb-1.5 shadow-sm">
@@ -97,7 +116,7 @@ export const MainLayout: React.FC = () => {
           {/* Item 2: Painéis */}
           <button
             type="button"
-            onClick={() => setActiveTab('dashboards')}
+            onClick={() => handleTabChange('dashboards')}
             className={`flex flex-col items-center justify-center w-[62px] h-[68px] rounded-[10px] transition-colors cursor-pointer ${
               activeTab === 'dashboards' ? 'bg-[#1F8A4C]' : 'bg-[#0B4B24] hover:bg-[#136331]'
             }`}
@@ -117,7 +136,7 @@ export const MainLayout: React.FC = () => {
           {/* Item 3: Histórico */}
           <button
             type="button"
-            onClick={() => setActiveTab('historico')}
+            onClick={() => handleTabChange('historico')}
             className={`flex flex-col items-center justify-center w-[62px] h-[68px] rounded-[10px] transition-colors cursor-pointer ${
               activeTab === 'historico' ? 'bg-[#1F8A4C]' : 'bg-[#0B4B24] hover:bg-[#136331]'
             }`}
@@ -137,7 +156,7 @@ export const MainLayout: React.FC = () => {
           {/* Item 4: Configuração */}
           <button
             type="button"
-            onClick={() => setActiveTab('config')}
+            onClick={() => handleTabChange('config')}
             className={`flex flex-col items-center justify-center w-[62px] h-[68px] rounded-t-[10px] rounded-b-[30px] transition-colors cursor-pointer ${
               activeTab === 'config' ? 'bg-[#1F8A4C]' : 'bg-[#0B4B24] hover:bg-[#136331]'
             }`}
@@ -160,7 +179,38 @@ export const MainLayout: React.FC = () => {
       <main className="flex-1 relative overflow-y-auto pb-24 md:pb-0">
         {activeTab === 'dashboards' && <DashboardPage />}
         {activeTab === 'historico' && <HistoricoPage />}
-        {activeTab === 'config' && <AccountSettingsPage />}
+
+        {activeTab === 'config' && activeConfigSection === null && (
+          <ConfigPage onSelectSection={(sectionId) => setActiveConfigSection(sectionId)} />
+        )}
+
+        {activeTab === 'config' && activeConfigSection === 'acessibilidade' && (
+          <AccessibilitySettingsPage onBack={() => setActiveConfigSection(null)} />
+        )}
+
+        {activeTab === 'config' && activeConfigSection === 'local' && (
+          <LocationSettingsPage onBack={() => setActiveConfigSection(null)} />
+        )}
+
+        {activeTab === 'config' && activeConfigSection === 'fuso-horario' && (
+          <TimezoneSettingsPage onBack={() => setActiveConfigSection(null)} />
+        )}
+
+        {activeTab === 'config' && activeConfigSection === 'idioma' && (
+          <LanguageSettingsPage onBack={() => setActiveConfigSection(null)} />
+        )}
+
+        {activeTab === 'config' && activeConfigSection === 'gerenciamento-conta' && (
+          <AccountSettingsPage onBack={() => setActiveConfigSection(null)} />
+        )}
+
+        {activeTab === 'config' && activeConfigSection === 'privacidade-seguranca' && (
+          <PrivacySecuritySettingsPage onBack={() => setActiveConfigSection(null)} />
+        )}
+
+        {activeTab === 'config' && activeConfigSection === 'sobre' && (
+          <AboutSettingsPage onBack={() => setActiveConfigSection(null)} />
+        )}
       </main>
 
       {/* Navegação Mobile Inferior em Pílula Flutuante */}
@@ -171,7 +221,7 @@ export const MainLayout: React.FC = () => {
         <div className="pointer-events-auto bg-[#063819]/95 backdrop-blur-md p-1.5 rounded-full flex items-center gap-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.75)] border border-[#0B4B24]">
           <button
             type="button"
-            onClick={() => setActiveTab('mapa')}
+            onClick={() => handleTabChange('mapa')}
             className="flex flex-col items-center justify-center w-[68px] h-[56px] rounded-l-full rounded-r-[12px] transition-colors cursor-pointer bg-[#0B4B24] hover:bg-[#136331]"
           >
             <div className="w-[24px] h-[24px] bg-white rounded-full flex items-center justify-center mb-1 shadow-sm">
@@ -182,7 +232,7 @@ export const MainLayout: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => setActiveTab('dashboards')}
+            onClick={() => handleTabChange('dashboards')}
             className={`flex flex-col items-center justify-center w-[68px] h-[56px] rounded-[12px] transition-colors cursor-pointer ${
               activeTab === 'dashboards' ? 'bg-[#1F8A4C]' : 'bg-[#0B4B24] hover:bg-[#136331]'
             }`}
@@ -201,7 +251,7 @@ export const MainLayout: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => setActiveTab('historico')}
+            onClick={() => handleTabChange('historico')}
             className={`flex flex-col items-center justify-center w-[68px] h-[56px] rounded-[12px] transition-colors cursor-pointer ${
               activeTab === 'historico' ? 'bg-[#1F8A4C]' : 'bg-[#0B4B24] hover:bg-[#136331]'
             }`}
@@ -220,7 +270,7 @@ export const MainLayout: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => setActiveTab('config')}
+            onClick={() => handleTabChange('config')}
             className={`flex flex-col items-center justify-center w-[74px] h-[56px] rounded-l-[12px] rounded-r-full transition-colors cursor-pointer ${
               activeTab === 'config' ? 'bg-[#1F8A4C]' : 'bg-[#0B4B24] hover:bg-[#136331]'
             }`}

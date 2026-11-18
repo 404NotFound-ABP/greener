@@ -1618,12 +1618,14 @@ export const DashboardPage: React.FC = () => {
 
 
 
+        
         {/* Gráfico de linhas comparativo SVG */}
         <div className="w-full overflow-x-auto">
           <svg
-          viewBox="0 0 920 270"
-          preserveAspectRatio="xMidYMid meet"
-          className="block w-full min-w-[680px] h-auto select-none"
+            viewBox="0 0 920 270"
+            preserveAspectRatio="xMidYMid meet"
+            onMouseLeave={() => setChartTooltip(null)}
+            className="block w-full min-w-[680px] h-auto select-none"
           >
             <style>
               {`
@@ -1763,56 +1765,42 @@ export const DashboardPage: React.FC = () => {
                   />
 
                   {/* Pontos interativos para consultar cada medição */}
-                  {coords.map((point, pointIdx) => (
-                    <circle
-                      key={`${svc.code}-${pointIdx}`}
-                      cx={point.x}
-                      cy={point.y}
-                      r="9"
-                      fill="transparent"
-                      className="cursor-pointer"
-                      tabIndex={0}
-                      role="button"
-                      aria-label={`${svc.code}: ${svc.series[pointIdx]} kWh, ${60 - Math.round((pointIdx / Math.max(svc.series.length - 1, 1)) * 60)} minutos atrás`}
-                      onMouseEnter={() =>
-                        setChartTooltip({
-                          serviceCode: svc.code,
-                          value: svc.series[pointIdx],
-                          minutes: 60 - Math.round(
-                            (pointIdx / Math.max(svc.series.length - 1, 1)) * 60
-                          ),
-                          x: point.x,
-                          y: point.y,
-                          color: colorSet.stroke,
-                        })
-                      }
-                      onFocus={() =>
-                        setChartTooltip({
-                          serviceCode: svc.code,
-                          value: svc.series[pointIdx],
-                          minutes: 60 - Math.round(
-                            (pointIdx / Math.max(svc.series.length - 1, 1)) * 60
-                          ),
-                          x: point.x,
-                          y: point.y,
-                          color: colorSet.stroke,
-                        })
-                      }
-                      onBlur={() => setChartTooltip(null)}
-                      onClick={() =>
-                        setChartTooltip({
-                          serviceCode: svc.code,
-                          value: svc.series[pointIdx],
-                          minutes: 60 - Math.round(
-                            (pointIdx / Math.max(svc.series.length - 1, 1)) * 60
-                          ),
-                          x: point.x,
-                          y: point.y,
-                          color: colorSet.stroke,
-                        })
-                      }
-                    />
-                  ))}
+                  {coords.map((point, pointIdx) => {
+                    const minutesAgo =
+                      60 -
+                      Math.round(
+                        (pointIdx / Math.max(svc.series.length - 1, 1)) * 60
+                      );
+
+                    const showPointTooltip = () =>
+                      setChartTooltip({
+                        serviceCode: svc.code,
+                        value: svc.series[pointIdx],
+                        minutes: minutesAgo,
+                        x: point.x,
+                        y: point.y,
+                        color: colorSet.stroke,
+                      });
+
+                    return (
+                      <circle
+                        key={`${svc.code}-${pointIdx}`}
+                        cx={point.x}
+                        cy={point.y}
+                        r="9"
+                        fill="transparent"
+                        className="cursor-pointer"
+                        tabIndex={0}
+                        role="button"
+                        aria-label={`${svc.code}: ${svc.series[pointIdx]} kWh, ${minutesAgo} minutos atrás`}
+                        onMouseEnter={showPointTooltip}
+                        onMouseLeave={() => setChartTooltip(null)}
+                        onFocus={showPointTooltip}
+                        onBlur={() => setChartTooltip(null)}
+                        onClick={showPointTooltip}
+                      />
+                    );
+                  })}
 
                   {/* Marcador do último valor */}
                   {lastPoint && (
@@ -1897,9 +1885,7 @@ export const DashboardPage: React.FC = () => {
             )}
           </svg>
         </div>
-      </div>
-
-
+        </div>
 
       {/* Card: Todos os serviços */}
 
@@ -2270,73 +2256,18 @@ export const DashboardPage: React.FC = () => {
               <table className="w-full text-left text-sm whitespace-nowrap border-collapse">
 
                 <thead>
-
                   <tr className="bg-[#96AA9E] text-[#07150E] text-xs font-semibold">
-
                     <th className="py-3 pl-4 pr-2 rounded-l-lg w-10"></th>
-
-                    <th className="py-3 px-3 border-r border-[#07150E]/20">
-
-                      <div className="flex items-center justify-between gap-2">
-
-                        <span>Serviço</span>
-
-                        <span>▼</span>
-
-                      </div>
-
-                    </th>
-
+                    <th className="py-3 px-3 border-r border-[#07150E]/20">Serviço</th>
+                    <th className="py-3 px-4 border-r border-[#07150E]/20">Localização</th>
+                    <th className="py-3 px-4 border-r border-[#07150E]/20">Status</th>
                     <th className="py-3 px-4 border-r border-[#07150E]/20">
-
-                      <div className="flex items-center justify-between gap-2">
-
-                        <span>Localização</span>
-
-                        <span>▼</span>
-
-                      </div>
-
+                      Consumo no período (kWh)
                     </th>
-
-                    <th className="py-3 px-4 border-r border-[#07150E]/20">
-
-                      <div className="flex items-center justify-between gap-2">
-
-                        <span>Status</span>
-
-                        <span>▼</span>
-
-                      </div>
-
-                    </th>
-
-                    <th className="py-3 px-4 border-r border-[#07150E]/20">
-
-                      <div className="flex items-center justify-between gap-2">
-
-                        <span>Consumo no período (kWh)</span>
-
-                        <span>▼</span>
-
-                      </div>
-
-                    </th>
-
                     <th className="py-3 px-4 rounded-r-lg">
-
-                      <div className="flex items-center justify-between gap-2">
-
-                        <span>Emissão no período (kgCO₂e)</span>
-
-                        <span>▼</span>
-
-                      </div>
-
+                      Emissão no período (kgCO₂e)
                     </th>
-
                   </tr>
-
                 </thead>
 
                 <tbody>

@@ -43,8 +43,8 @@ const previewTiles = {
 };
 
 /**
- * Extrai e valida coordenadas de múltiplos formatos possíveis vindos da API.
- * Retorna null quando ausentes, nulas, vazias ou fora da faixa geográfica válida.
+- Extrai e valida coordenadas de múltiplos formatos possíveis vindos da API.
+- Retorna null quando ausentes, nulas, vazias ou fora da faixa geográfica válida.
  */
 export function extractValidCoordinates(service: ServiceData): [number, number] | null {
   const raw = service as ServiceData & {
@@ -96,7 +96,7 @@ export function extractValidCoordinates(service: ServiceData): [number, number] 
 }
 
 /**
- * Formata a localização textual tratando ausência parcial ou total de cidade, região e país (T23.2/US10).
+- Formata a localização textual tratando ausência parcial ou total de cidade, região e país (T23.2/US10).
  */
 export function formatServiceLocation(localizacao?: {
   cidade?: string | null;
@@ -167,6 +167,7 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
   const [tileErrorCount, setTileErrorCount] = useState(0);
   const [tileRetryKey, setTileRetryKey] = useState(0);
   const [selectedListService, setSelectedListService] = useState<ServiceData | null>(null);
+  const [isEmptyBannerDismissed, setIsEmptyBannerDismissed] = useState(false);
 
   const [activeFilters, setActiveFilters] = useState({
     ativo: true,
@@ -205,6 +206,7 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
     if (mapInstance) {
       mapInstance.closePopup();
     }
+    setIsEmptyBannerDismissed(false);
     setTimeout(() => {
       setActiveFilters(prev => ({ ...prev, [status]: !prev[status] }));
     }, 50);
@@ -214,6 +216,7 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
     if (mapInstance) {
       mapInstance.closePopup();
     }
+    setIsEmptyBannerDismissed(false);
     setActiveFilters({
       ativo: true,
       indisponível: true,
@@ -298,7 +301,8 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
 
   const hasMapLayerFailure = tileErrorCount >= 4;
   const isInitialLoading = isRefreshing && services.length === 0;
-  const showEmptyMarkersBanner = !isInitialLoading && mappableMarkers.length === 0;
+  const showEmptyMarkersBanner =
+    !isInitialLoading && mappableMarkers.length === 0 && !isEmptyBannerDismissed;
 
   return (
     <div className={`relative w-full h-full bg-neutro-900 ${themes[currentTheme].cssClass}`}>
@@ -442,15 +446,34 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
             role="status"
             className="pointer-events-auto max-w-md px-4 py-3 rounded-[16px] bg-[#081C12]/92 backdrop-blur-xl border border-[#F2FAF5]/40 text-[#F2FAF5] text-[12px] sm:text-[13px] flex flex-col gap-2 shadow-2xl"
           >
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" />
-              <span className="font-semibold">
-                {services.length === 0
-                  ? 'Nenhum serviço disponível no momento'
-                  : filteredServices.length === 0
-                  ? 'Nenhum marcador corresponde aos filtros selecionados'
-                  : 'Nenhum serviço filtrado possui coordenadas para exibição no mapa'}
-              </span>
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" />
+                <span className="font-semibold">
+                  {services.length === 0
+                    ? 'Nenhum serviço disponível no momento'
+                    : filteredServices.length === 0
+                    ? 'Nenhum marcador corresponde aos filtros selecionados'
+                    : 'Nenhum serviço filtrado possui coordenadas para exibição no mapa'}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsEmptyBannerDismissed(true)}
+                aria-label="Fechar aviso"
+                title="Fechar aviso"
+                className="w-6 h-6 -mt-0.5 -mr-1 rounded-full flex items-center justify-center text-[#DDF1E5]/70 hover:text-[#F2FAF5] hover:bg-[#F2FAF5]/15 transition-colors shrink-0 cursor-pointer"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none">
+                  <path
+                    d="M3 3L11 11M11 3L3 11"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
             </div>
             <p className="text-[#DDF1E5]/85 text-[11px] sm:text-[12px] leading-relaxed">
               {filteredServices.length > 0
