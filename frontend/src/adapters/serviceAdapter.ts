@@ -17,10 +17,23 @@ export interface ExternalServicePayload {
   nome?: string;
   name?: string;
   status?: string;
+  coords?: [number, number] | null;
+  coordenadas?:
+    | [number, number]
+    | { lat?: number | null; lng?: number | null; latitude?: number | null; longitude?: number | null }
+    | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  lat?: number | null;
+  lng?: number | null;
   localizacao?: {
     pais?: string | null;
     regiao?: string | null;
     cidade?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    lat?: number | null;
+    lng?: number | null;
   } | null;
   valores?: {
     kwh?: number | null;
@@ -33,16 +46,51 @@ const sanitizeLocationField = (value?: string | null): string | undefined => {
   return trimmed ? trimmed : undefined;
 };
 
+function getCoordinates(raw: ExternalServicePayload): [number, number] | undefined {
+  let latitude: number | null | undefined;
+  let longitude: number | null | undefined;
+
+  if (raw.coords) {
+    [latitude, longitude] = raw.coords;
+  } else if (Array.isArray(raw.coordenadas)) {
+    [latitude, longitude] = raw.coordenadas;
+  } else if (raw.coordenadas) {
+    latitude = raw.coordenadas.lat ?? raw.coordenadas.latitude;
+    longitude = raw.coordenadas.lng ?? raw.coordenadas.longitude;
+  } else {
+    latitude = raw.latitude ?? raw.lat ?? raw.localizacao?.latitude ?? raw.localizacao?.lat;
+    longitude = raw.longitude ?? raw.lng ?? raw.localizacao?.longitude ?? raw.localizacao?.lng;
+  }
+
+  if (
+    typeof latitude !== 'number' ||
+    typeof longitude !== 'number' ||
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    latitude < -90 ||
+    latitude > 90 ||
+    longitude < -180 ||
+    longitude > 180
+  ) {
+    return undefined;
+  }
+
+  return [latitude, longitude];
+}
+
 /**
  * Adapter responsável por converter o payload externo no DTO ServiceData,
  * garantindo resiliência contra campos ausentes ou localização incompleta (T23/US10).
  */
 export class ServiceAdapter {
   static toDTO(raw: ExternalServicePayload): ServiceData {
+    const coords = getCoordinates(raw);
+
     return {
       id: String(raw.id),
       nome: (raw.nome ?? raw.name ?? 'Serviço sem nome').trim(),
       status: normalizeServiceStatus(raw.status),
+      ...(coords ? { coords } : {}),
       localizacao: {
         pais: sanitizeLocationField(raw.localizacao?.pais),
         regiao: sanitizeLocationField(raw.localizacao?.regiao),
@@ -101,6 +149,7 @@ const INITIAL_MOCK_SERVICES: ServiceData[] = [
     nome: 'Serviço',
     status: 'Ativo',
     localizacao: { pais: 'Brasil', regiao: 'Sudeste', cidade: 'Caçapava' },
+    coords: [-23.1009, -45.7069],
     valores: { kwh: 100, gco2e: 45 }
   },
   {
@@ -108,6 +157,7 @@ const INITIAL_MOCK_SERVICES: ServiceData[] = [
     nome: 'Serviço',
     status: 'Indisponível',
     localizacao: { pais: 'Brasil', regiao: 'Sudeste', cidade: 'Caçapava' },
+    coords: [-23.0999, -45.7069],
     valores: { kwh: 100, gco2e: 0 }
   },
   {
@@ -115,6 +165,7 @@ const INITIAL_MOCK_SERVICES: ServiceData[] = [
     nome: 'ASTAH-STU',
     status: 'Sem métrica',
     localizacao: { pais: 'Brasil', regiao: 'Sudeste', cidade: 'Taubaté' },
+    coords: [-23.0264, -45.5553],
     valores: { kwh: 100, gco2e: 32 }
   }
 ];
@@ -133,7 +184,7 @@ export class MockServiceRepository implements ServiceRepository {
         return service;
       }
       const deltaKwh = Math.floor(Math.random() * 5) - 2;
-      const nextKwh = Math.max(10, service.valores.kwh + deltaKwh);
+      const nextKwh = Math.max(10, (service.valores.kwh ?? 0) + deltaKwh);
       const nextCo2 = Math.max(5, Math.round(nextKwh * 0.45));
 
       return {

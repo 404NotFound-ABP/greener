@@ -3,7 +3,14 @@ import { OrbitsBackground } from '../components/auth/OrbitsBackground';
 import { GreenerGlobeLogo } from '../components/auth/GreenerGlobeLogo';
 
 interface RegisterProps {
-  onNextStep?: () => void;
+  onNextStep?: (dados: DadosCadastro) => void;
+}
+
+export interface DadosCadastro {
+  nome: string;
+  sobrenome: string;
+  email: string;
+  telefone: string;
 }
 
 export const Register: React.FC<RegisterProps> = ({ onNextStep }) => {
@@ -20,7 +27,7 @@ export const Register: React.FC<RegisterProps> = ({ onNextStep }) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onNextStep?.();
+    onNextStep?.(formData);
   };
 
   return (

@@ -3,6 +3,8 @@ import type { ServiceData } from '../types/service';
 import { formatEnvironmentalMetric } from '../utils/environmentalMetrics';
 
 export interface ServiceCardProps {
+  markerVisible?: boolean;
+  onToggleMarker?: () => void;
   service: ServiceData & {
     periodo?: string;
     estimado?: boolean;
@@ -16,8 +18,13 @@ export interface ServiceCardProps {
   };
 }
 
-export const ServiceCard: React.FC<ServiceCardProps> = ({ service }) => {
-  const [isSelected, setIsSelected] = useState(false);
+export const ServiceCard: React.FC<ServiceCardProps> = ({
+  service,
+  markerVisible,
+  onToggleMarker
+}) => {
+  const [locallySelected, setLocallySelected] = useState(false);
+  const isSelected = markerVisible ?? locallySelected;
 
   const statusNorm = service?.status?.toLowerCase().trim() || '';
   const isAtivo = statusNorm === 'ativo';
@@ -114,8 +121,15 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ service }) => {
         <div className="self-stretch px-[5px] flex justify-start items-center gap-[8px]">
           <button
             type="button"
-            onClick={() => setIsSelected(!isSelected)}
+            onClick={event => {
+              event.stopPropagation();
+              if (markerVisible === undefined) {
+                setLocallySelected(previous => !previous);
+              }
+              onToggleMarker?.();
+            }}
             aria-label={`Selecionar ${service.nome}`}
+            aria-pressed={isSelected}
             className={`w-[25px] h-[25px] relative rounded-[5px] border border-[#2FA862] flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
               isSelected ? 'bg-[#2FA862]' : 'bg-transparent hover:bg-[#2FA862]/20'
             }`}

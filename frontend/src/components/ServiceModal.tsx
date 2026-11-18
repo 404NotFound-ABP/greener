@@ -1,5 +1,4 @@
 import React from 'react';
-import { useMap } from 'react-leaflet';
 import { formatEnvironmentalMetric } from '../utils/environmentalMetrics';
 
 export interface ModalServiceData {
@@ -16,13 +15,12 @@ export interface ModalServiceData {
 
 export interface ServiceModalProps {
   service: ModalServiceData;
+  onClose?: () => void;
 }
 
 const METRICS_ITEMS: string[] = ['CPU', 'Memória', 'Armazenamento', 'Rede'];
 
-export const ServiceModal: React.FC<ServiceModalProps> = ({ service }) => {
-  const map = useMap();
-
+export const ServiceModal: React.FC<ServiceModalProps> = ({ service, onClose }) => {
   const statusNorm = service.status.toLowerCase();
   const isAtivo = statusNorm === 'ativo';
   const isIndisponivel = statusNorm === 'indisponível' || statusNorm === 'indisponivel';
@@ -37,76 +35,59 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({ service }) => {
   return (
     <div
       translate="no"
-      className={`p-[16px] sm:p-[20px] bg-[#0E3B25]/85 sm:bg-[#0E3B25]/25 backdrop-blur-xl rounded-tr-[16px] rounded-br-[16px] rounded-bl-[16px] border-l border-t border-[#F2FAF5] shadow-[inset_-4px_-4px_12px_rgba(14,59,37,0.3),0_12px_28px_rgba(0,0,0,0.35)] flex flex-col justify-start items-start gap-[12px] sm:gap-[14px] text-[#F2FAF5] font-sans select-none ${
-        isSemMetricas
-          ? 'w-[calc(100vw-48px)] max-w-[340px]'
-          : 'w-[calc(100vw-48px)] max-w-[440px]'
-      }`}
+      className={`w-[calc(100vw-32px)] max-w-[360px] max-h-[calc(100vh-32px)] overflow-y-auto p-[12px] sm:p-[14px] bg-[#07180F]/95 backdrop-blur-xl rounded-[14px] border border-[#557364]/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_12px_28px_rgba(0,0,0,0.5)] flex flex-col justify-start items-start gap-[9px] sm:gap-[10px] text-[#F2FAF5] font-sans select-none`}
     >
       {/* 1. TOPO: NOME DO SERVIÇO + BOTÃO DE FECHAR */}
-      <div className="self-stretch flex justify-between items-center">
-        <div className="text-[#F2FAF5] text-[18px] sm:text-[20px] font-medium leading-[26px] sm:leading-[28px] tracking-wide">
+      <div className="self-stretch flex justify-between items-center gap-3">
+        <div className="min-w-0 truncate text-[#F2FAF5] text-[15px] sm:text-[16px] font-semibold leading-[22px] tracking-wide">
           {service.name}
         </div>
 
         <button
           type="button"
-          onClick={() => map.closePopup()}
+          onClick={onClose}
+          disabled={!onClose}
           title="Fechar"
-          className="w-[35px] h-[35px] relative bg-[#1F8A4C]/50 hover:bg-[#1F8A4C]/80 overflow-hidden rounded-[14px] border border-[#2FA862] flex items-center justify-center text-[#F2FAF5] transition-colors cursor-pointer shrink-0"
+          aria-label="Fechar detalhes do serviço"
+          className="w-[25px] h-[25px] relative bg-[#1F8A4C]/35 hover:bg-[#1F8A4C]/70 overflow-hidden rounded-[8px] border border-[#2FA862]/70 flex items-center justify-center text-[#F2FAF5] transition-colors cursor-pointer shrink-0 disabled:cursor-default"
         >
-          <svg className="w-[14px] h-[14px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-[12px] h-[12px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       </div>
 
       {/* 2. BADGE DE ESTADO + CIDADE + ESTIMATIVA */}
-      <div className="flex justify-start items-center gap-[8px] flex-wrap">
+      <div className="self-stretch flex justify-start items-center gap-[5px] flex-wrap">
         {isAtivo && (
-          <div className="px-[10px] py-[5px] bg-[#1F8A4C]/20 overflow-hidden rounded-[10px] border border-[#2FA862] flex justify-start items-center gap-[4px]">
-            <div className="w-[22px] h-[22px] sm:w-[25px] sm:h-[25px] relative overflow-hidden flex items-center justify-center">
-              <svg className="w-[18px] h-[18px] text-[#F7F7F5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <rect x="3" y="3" width="18" height="18" rx="4" strokeWidth="2" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M9 12l2 2 4-4" />
-              </svg>
-            </div>
-            <span className="text-[#F7F7F5] text-[14px] sm:text-[16px] font-normal leading-[22px] sm:leading-[24px]">
+          <div className="px-[7px] py-[3px] bg-[#1F8A4C]/20 overflow-hidden rounded-[6px] border border-[#2FA862]/80 flex justify-start items-center gap-[4px]">
+            <span className="w-[7px] h-[7px] rounded-full bg-[#39D879] shadow-[0_0_7px_rgba(57,216,121,0.7)]" />
+            <span className="text-[#F7F7F5] text-[11px] font-medium leading-[16px]">
               Ativo
             </span>
           </div>
         )}
 
         {isIndisponivel && (
-          <div className="px-[10px] py-[5px] bg-[#9C2A2A]/20 overflow-hidden rounded-[10px] border border-[#9C2A2A] flex justify-start items-center gap-[4px]">
-            <div className="w-[22px] h-[22px] sm:w-[25px] sm:h-[25px] relative overflow-hidden flex items-center justify-center">
-              <svg className="w-[18px] h-[18px] text-[#F7F7F5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <rect x="3" y="3" width="18" height="18" rx="4" strokeWidth="2" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M10 10l4 4m0-4l-4 4" />
-              </svg>
-            </div>
-            <span className="text-[#F7F7F5] text-[14px] sm:text-[16px] font-normal leading-[22px] sm:leading-[24px]">
+          <div className="px-[7px] py-[3px] bg-[#9C2A2A]/20 overflow-hidden rounded-[6px] border border-[#D34A4A]/80 flex justify-start items-center gap-[4px]">
+            <span className="w-[7px] h-[7px] rounded-full bg-[#F05252] shadow-[0_0_7px_rgba(240,82,82,0.7)]" />
+            <span className="text-[#F7F7F5] text-[11px] font-medium leading-[16px]">
               Indisponível
             </span>
           </div>
         )}
 
         {isSemMetricas && (
-          <div className="px-[10px] py-[5px] bg-[#B8B7B8]/20 overflow-hidden rounded-[10px] border border-[#B8B7B8] flex justify-start items-center gap-[4px]">
-            <div className="w-[22px] h-[22px] sm:w-[25px] sm:h-[25px] relative overflow-hidden flex items-center justify-center">
-              <svg className="w-[18px] h-[18px] text-[#F7F7F5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <rect x="3" y="3" width="18" height="18" rx="4" strokeWidth="2" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M8 12h8" />
-              </svg>
-            </div>
-            <span className="text-[#F7F7F5] text-[14px] sm:text-[16px] font-normal leading-[22px] sm:leading-[24px]">
+          <div className="px-[7px] py-[3px] bg-[#B8B7B8]/15 overflow-hidden rounded-[6px] border border-[#B8B7B8]/70 flex justify-start items-center gap-[4px]">
+            <span className="w-[7px] h-[7px] rounded-full bg-[#B8B7B8]" />
+            <span className="text-[#F7F7F5] text-[11px] font-medium leading-[16px]">
               Sem métricas
             </span>
           </div>
         )}
 
-        <div className="px-[8px] py-[4px] bg-transparent rounded-[8px] border border-[#2FA862] flex justify-start items-center">
-          <span className="text-[#F2FAF5] text-[13px] sm:text-[14px] font-normal leading-[20px]">
+        <div className="max-w-full px-[7px] py-[3px] bg-transparent rounded-[6px] border border-[#2FA862]/70 flex justify-start items-center">
+          <span className="truncate text-[#F2FAF5] text-[10px] sm:text-[11px] font-normal leading-[16px]">
             Cidade: {locationLabel}
           </span>
         </div>
@@ -114,12 +95,12 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({ service }) => {
         {service.isEstimated && !isSemMetricas && (
           <div
             title="Valores calculados por estimativa ambiental"
-            className="px-[8px] py-[4px] bg-[#D97706]/20 rounded-[8px] border border-[#D97706] flex justify-start items-center gap-[4px]"
+            className="px-[7px] py-[3px] bg-[#D97706]/20 rounded-[6px] border border-[#D97706] flex justify-start items-center gap-[4px]"
           >
-            <svg className="w-[14px] h-[14px] text-[#FBBF24]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <svg className="w-[12px] h-[12px] text-[#FBBF24]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span className="text-[#FBBF24] text-[12px] sm:text-[13px] font-medium leading-[18px]">
+            <span className="text-[#FBBF24] text-[10px] font-medium leading-[16px]">
               Estimado
             </span>
           </div>
@@ -129,42 +110,42 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({ service }) => {
       {/* VARIAÇÃO 1: ATIVO */}
       {isAtivo && (
         <>
-          <div className="self-stretch flex flex-col gap-[6px]">
-            <div className="flex items-center justify-between text-[#A6DEBD] text-[12px] leading-[16px]">
-              <span>Indicadores ambientais</span>
-              <span>Período: {periodLabel}</span>
+          <div className="self-stretch flex flex-col gap-[5px]">
+            <div className="flex items-center justify-between gap-2 text-[#A6DEBD] text-[10px] leading-[14px]">
+              <span className="font-medium">Indicadores ambientais</span>
+              <span className="text-right">Período: {periodLabel}</span>
             </div>
 
-            <div className="self-stretch grid grid-cols-2 gap-[10px] sm:gap-[12px]">
-              <div className="p-[10px] bg-transparent rounded-[10px] border border-[#2FA862] flex flex-col justify-start items-start gap-[4px]">
+            <div className="self-stretch grid grid-cols-2 gap-[7px]">
+              <div className="min-w-0 p-[8px] bg-[#0C2819] rounded-[8px] border border-[#2FA862]/70 flex flex-col justify-start items-start gap-[2px]">
                 {kwhMetric.isAvailable ? (
                   <>
-                    <div className="text-[#F2FAF5] text-[22px] sm:text-[28px] font-bold leading-[28px] sm:leading-[34px] whitespace-nowrap">
+                    <div className="max-w-full truncate text-[#F2FAF5] text-[18px] sm:text-[21px] font-bold leading-[25px] whitespace-nowrap">
                       {kwhMetric.displayWithUnit}
                     </div>
-                    <div className="text-[#A6DEBD] text-[11px] font-normal leading-[15px]">
+                    <div className="text-[#A6DEBD] text-[9px] font-normal leading-[13px]">
                       {periodLabel}
                     </div>
                   </>
                 ) : (
-                  <div className="text-[#DDF1E5]/70 text-[16px] sm:text-[18px] font-semibold leading-[26px]">
+                  <div className="text-[#DDF1E5]/70 text-[12px] font-semibold leading-[18px]">
                     Consumo indisponível
                   </div>
                 )}
               </div>
 
-              <div className="p-[10px] bg-transparent rounded-[10px] border border-[#2FA862] flex flex-col justify-start items-start gap-[4px]">
+              <div className="min-w-0 p-[8px] bg-[#0C2819] rounded-[8px] border border-[#2FA862]/70 flex flex-col justify-start items-start gap-[2px]">
                 {co2Metric.isAvailable ? (
                   <>
-                    <div className="text-[#F2FAF5] text-[22px] sm:text-[28px] font-bold leading-[28px] sm:leading-[34px] whitespace-nowrap">
+                    <div className="max-w-full truncate text-[#F2FAF5] text-[18px] sm:text-[21px] font-bold leading-[25px] whitespace-nowrap">
                       {co2Metric.displayWithUnit}
                     </div>
-                    <div className="text-[#A6DEBD] text-[11px] font-normal leading-[15px]">
+                    <div className="text-[#A6DEBD] text-[9px] font-normal leading-[13px]">
                       {periodLabel}
                     </div>
                   </>
                 ) : (
-                  <div className="text-[#DDF1E5]/70 text-[16px] sm:text-[18px] font-semibold leading-[26px]">
+                  <div className="text-[#DDF1E5]/70 text-[12px] font-semibold leading-[18px]">
                     Emissão indisponível
                   </div>
                 )}
@@ -172,18 +153,18 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({ service }) => {
             </div>
           </div>
 
-          <div className="self-stretch overflow-hidden flex flex-col justify-start items-start gap-[6px]">
-            <span className="text-[#A6DEBD] text-[12px] font-normal leading-[16px]">
+          <div className="self-stretch overflow-hidden flex flex-col justify-start items-start gap-[4px]">
+            <span className="text-[#A6DEBD] text-[10px] font-medium leading-[14px]">
               Métricas disponíveis
             </span>
-            <div className="self-stretch flex justify-start items-center gap-[6px] flex-wrap sm:flex-nowrap">
+            <div className="self-stretch flex justify-start items-center gap-[4px] flex-wrap">
               {METRICS_ITEMS.map((label) => (
                 <div
                   key={label}
-                  className="px-[8px] py-[4px] bg-transparent rounded-[8px] border border-[#2FA862] flex justify-start items-center gap-[4px] shrink-0 whitespace-nowrap"
+                  className="px-[5px] py-[2px] bg-[#0C2819] rounded-[5px] border border-[#2FA862]/60 flex justify-start items-center gap-[3px] shrink-0 whitespace-nowrap"
                 >
                   <svg
-                    className="w-[15px] h-[15px] text-[#F2FAF5] shrink-0"
+                    className="w-[11px] h-[11px] text-[#6FE39A] shrink-0"
                     viewBox="0 0 15 15"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
@@ -191,12 +172,12 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({ service }) => {
                     <path
                       d="M1.5 7.5L5.5 11.5L13.5 3.5"
                       stroke="#F2FAF5"
-                      strokeWidth="1.8"
+                      strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     />
                   </svg>
-                  <span className="text-[#F2FAF5] text-[13px] sm:text-[14px] font-normal leading-[20px]">
+                  <span className="text-[#F2FAF5] text-[9px] sm:text-[10px] font-normal leading-[14px]">
                     {label}
                   </span>
                 </div>
@@ -204,13 +185,13 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({ service }) => {
             </div>
           </div>
 
-          <div className="text-[#A6DEBD] text-[12px] font-normal leading-[16px]">
+          <div className="text-[#A6DEBD] text-[9px] font-normal leading-[13px]">
             Última atualização: {service.lastUpdate || 'Aguardando sincronização'}
           </div>
 
           <button
             type="button"
-            className="self-stretch h-[48px] sm:h-[56px] px-[24px] sm:px-[32px] bg-[#1F8A4C] hover:bg-[#2FA862] overflow-hidden rounded-[10px] flex justify-center items-center text-white text-[15px] sm:text-[16px] font-medium leading-[24px] transition-colors cursor-pointer"
+            className="self-stretch h-[38px] px-[14px] bg-[#168747] hover:bg-[#1F9B52] overflow-hidden rounded-[7px] border border-[#36B86A]/70 flex justify-center items-center text-white text-[11px] font-semibold leading-[18px] transition-colors cursor-pointer"
           >
             Ver dashboard completo
           </button>
@@ -220,38 +201,38 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({ service }) => {
       {/* VARIAÇÃO 2: INDISPONÍVEL */}
       {isIndisponivel && (
         <>
-          <div className="self-stretch p-[12px] bg-[#9C2A2A]/15 rounded-[10px] border border-dashed border-[#9C2A2A] flex justify-start items-center gap-[10px]">
-            <div className="w-[20px] h-[20px] bg-[#9C2A2A] rounded-full flex justify-center items-center shrink-0">
-              <span className="text-[#F7F7F5] text-[13px] font-bold leading-none">!</span>
+          <div className="self-stretch p-[8px] bg-[#6E1C1C]/25 rounded-[7px] border border-[#B73B3B]/70 flex justify-start items-center gap-[7px]">
+            <div className="w-[16px] h-[16px] bg-[#9C2A2A] rounded-full flex justify-center items-center shrink-0">
+              <span className="text-[#F7F7F5] text-[10px] font-bold leading-none">!</span>
             </div>
-            <span className="text-[#F2FAF5] text-[13px] sm:text-[14px] font-normal leading-[20px]">
+            <span className="text-[#F2FAF5] text-[10px] sm:text-[11px] font-normal leading-[16px]">
               {service.lastUpdate ? `Sem conexão desde ${service.lastUpdate}` : 'Serviço sem conexão ativa'}
             </span>
           </div>
 
-          <div className="self-stretch flex flex-col justify-center items-start gap-[10px]">
-            <span className="text-[#A6DEBD] text-[12px] font-normal leading-[16px]">
+          <div className="self-stretch flex flex-col justify-center items-start gap-[5px]">
+            <span className="text-[#A6DEBD] text-[10px] font-medium leading-[14px]">
               Valores da última atualização ({periodLabel})
             </span>
-            <div className="self-stretch grid grid-cols-2 gap-[10px] sm:gap-[15px]">
-              <div className="p-[10px] bg-transparent rounded-[10px] border border-[#9C2A2A] flex flex-col justify-center items-center text-center">
+            <div className="self-stretch grid grid-cols-2 gap-[7px]">
+              <div className="min-w-0 p-[8px] bg-[#0C2819] rounded-[7px] border border-[#9C2A2A]/80 flex flex-col justify-center items-center text-center">
                 {kwhMetric.isAvailable ? (
-                  <span className="text-[#F2FAF5] text-[22px] sm:text-[28px] font-bold leading-[28px] sm:leading-[36px] whitespace-nowrap">
+                  <span className="max-w-full truncate text-[#F2FAF5] text-[17px] sm:text-[20px] font-bold leading-[25px] whitespace-nowrap">
                     {kwhMetric.displayWithUnit}
                   </span>
                 ) : (
-                  <span className="text-[#F2FAF5]/75 text-[15px] sm:text-[16px] font-medium leading-[22px]">
+                  <span className="text-[#F2FAF5]/75 text-[11px] font-medium leading-[17px]">
                     Consumo indisponível
                   </span>
                 )}
               </div>
-              <div className="p-[10px] bg-transparent rounded-[10px] border border-[#9C2A2A] flex flex-col justify-center items-center text-center">
+              <div className="min-w-0 p-[8px] bg-[#0C2819] rounded-[7px] border border-[#9C2A2A]/80 flex flex-col justify-center items-center text-center">
                 {co2Metric.isAvailable ? (
-                  <span className="text-[#F2FAF5] text-[22px] sm:text-[28px] font-bold leading-[28px] sm:leading-[36px] whitespace-nowrap">
+                  <span className="max-w-full truncate text-[#F2FAF5] text-[17px] sm:text-[20px] font-bold leading-[25px] whitespace-nowrap">
                     {co2Metric.displayWithUnit}
                   </span>
                 ) : (
-                  <span className="text-[#F2FAF5]/75 text-[15px] sm:text-[16px] font-medium leading-[22px]">
+                  <span className="text-[#F2FAF5]/75 text-[11px] font-medium leading-[17px]">
                     Emissão indisponível
                   </span>
                 )}
@@ -259,18 +240,18 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({ service }) => {
             </div>
           </div>
 
-          <div className="self-stretch overflow-hidden flex flex-col justify-start items-start gap-[6px]">
-            <span className="text-[#A6DEBD] text-[12px] font-normal leading-[16px]">
+          <div className="self-stretch overflow-hidden flex flex-col justify-start items-start gap-[4px]">
+            <span className="text-[#A6DEBD] text-[10px] font-medium leading-[14px]">
               Métricas disponíveis
             </span>
-            <div className="self-stretch flex justify-start items-center gap-[6px] flex-wrap sm:flex-nowrap">
+            <div className="self-stretch flex justify-start items-center gap-[4px] flex-wrap">
               {METRICS_ITEMS.map((label) => (
                 <div
                   key={label}
-                  className="px-[8px] py-[4px] bg-transparent rounded-[8px] border border-[#2FA862] flex justify-start items-center gap-[4px] shrink-0 whitespace-nowrap"
+                  className="px-[5px] py-[2px] bg-[#0C2819] rounded-[5px] border border-[#2FA862]/60 flex justify-start items-center gap-[3px] shrink-0 whitespace-nowrap"
                 >
                   <svg
-                    className="w-[15px] h-[15px] text-[#F2FAF5] shrink-0"
+                    className="w-[11px] h-[11px] text-[#6FE39A] shrink-0"
                     viewBox="0 0 15 15"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
@@ -278,12 +259,12 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({ service }) => {
                     <path
                       d="M1.5 7.5L5.5 11.5L13.5 3.5"
                       stroke="#F2FAF5"
-                      strokeWidth="1.8"
+                      strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     />
                   </svg>
-                  <span className="text-[#F2FAF5] text-[13px] sm:text-[14px] font-normal leading-[20px]">
+                  <span className="text-[#F2FAF5] text-[9px] sm:text-[10px] font-normal leading-[14px]">
                     {label}
                   </span>
                 </div>
@@ -291,13 +272,13 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({ service }) => {
             </div>
           </div>
 
-          <div className="text-[#A6DEBD] text-[12px] font-normal leading-[16px]">
+          <div className="text-[#A6DEBD] text-[9px] font-normal leading-[13px]">
             Última atualização: {service.lastUpdate || 'Indisponível'}
           </div>
 
           <button
             type="button"
-            className="self-stretch h-[48px] sm:h-[56px] px-[24px] sm:px-[32px] bg-[#1F8A4C] hover:bg-[#2FA862] overflow-hidden rounded-[10px] flex justify-center items-center text-white text-[15px] sm:text-[16px] font-medium leading-[24px] transition-colors cursor-pointer"
+            className="self-stretch h-[38px] px-[14px] bg-[#168747] hover:bg-[#1F9B52] overflow-hidden rounded-[7px] border border-[#36B86A]/70 flex justify-center items-center text-white text-[11px] font-semibold leading-[18px] transition-colors cursor-pointer"
           >
             Ver dashboard completo
           </button>
@@ -307,26 +288,26 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({ service }) => {
       {/* VARIAÇÃO 3: SEM MÉTRICAS */}
       {isSemMetricas && (
         <>
-          <div className="self-stretch flex flex-col justify-start items-start gap-[6px]">
-            <span className="text-[#A6DEBD] text-[12px] font-normal leading-[16px]">
+          <div className="self-stretch flex flex-col justify-start items-start gap-[4px]">
+            <span className="text-[#A6DEBD] text-[10px] font-medium leading-[14px]">
               Métricas disponíveis
             </span>
-            <div className="px-[10px] py-[4px] bg-transparent rounded-[8px] border border-[#2FA862] flex items-center">
-              <span className="text-[#F2FAF5] text-[14px] font-normal leading-[20px]">
+            <div className="px-[7px] py-[3px] bg-[#0C2819] rounded-[6px] border border-[#2FA862]/60 flex items-center">
+              <span className="text-[#F2FAF5] text-[10px] font-normal leading-[16px]">
                 – Nenhuma métrica recebida
               </span>
             </div>
           </div>
 
-          <div className="self-stretch py-[22px] sm:py-[28px] px-[16px] bg-[#F2FAF5]/10 rounded-[12px] flex flex-col items-center justify-center text-center gap-[12px]">
-            <div className="w-[48px] h-[48px] rounded-full bg-[#B8B7B8]/25 flex items-center justify-center">
-              <div className="w-[18px] h-[3px] bg-[#4A5550] rounded-full" />
+          <div className="self-stretch py-[12px] px-[10px] bg-[#F2F5F2] rounded-[8px] flex flex-col items-center justify-center text-center gap-[6px]">
+            <div className="w-[27px] h-[27px] rounded-full bg-[#DCE5DE] flex items-center justify-center">
+              <div className="w-[11px] h-[2px] bg-[#52645A] rounded-full" />
             </div>
-            <div className="flex flex-col gap-[4px]">
-              <span className="text-[#F2FAF5] sm:text-[#111A15] text-[15px] sm:text-[16px] font-medium leading-[22px]">
+            <div className="flex flex-col gap-[2px]">
+              <span className="text-[#17231B] text-[11px] font-semibold leading-[16px]">
                 Este serviço ainda não envia dados
               </span>
-              <span className="text-[#DDF1E5]/80 sm:text-[#3A4940] text-[12px] font-normal leading-[16px]">
+              <span className="text-[#52645A] text-[9px] font-normal leading-[13px]">
                 Resultados ambientais indisponíveis no momento.
               </span>
             </div>
@@ -334,7 +315,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({ service }) => {
 
           <button
             type="button"
-            className="self-stretch h-[48px] sm:h-[56px] px-[24px] sm:px-[32px] bg-transparent hover:bg-[#1F8A4C]/20 overflow-hidden rounded-[10px] border-[1.5px] border-[#1F8A4C] flex justify-center items-center text-[#F2FAF5] text-[15px] sm:text-[16px] font-medium leading-[24px] transition-colors cursor-pointer"
+            className="self-stretch h-[38px] px-[14px] bg-transparent hover:bg-[#1F8A4C]/20 overflow-hidden rounded-[7px] border border-[#2FA862]/80 flex justify-center items-center text-[#F2FAF5] text-[11px] font-semibold leading-[18px] transition-colors cursor-pointer"
           >
             Ver dashboard completo
           </button>

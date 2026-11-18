@@ -19,6 +19,7 @@ export interface ServiceData {
   nome: string;
   status: ServiceStatus;
   localizacao?: LocationData | null;
+  coords?: [number, number];
   valores: MetricsData;
   periodo?: string;
   estimado?: boolean;

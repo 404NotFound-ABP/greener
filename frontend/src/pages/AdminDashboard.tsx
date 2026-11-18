@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 
 // Dados simulados
-const users = [
+const initialUsers = [
   { id: '85548555', name: 'João Augusto de Souza', email: 'joao.augusto@gmail.com', role: 'Administrador', status: 'Ativo', lastAccess: '12/10/2026' },
   { id: '85548556', name: 'Maria Clara Santos', email: 'Maria.Sants@gmail.com', role: 'Administrador', status: 'Inativo', lastAccess: '13/10/2026' },
   { id: '85548557', name: 'Carlos Eduardo Lima', email: 'Lima_carlos.Edu@gmail.com', role: 'Usuário', status: 'Ativo', lastAccess: '14/09/2026' },
@@ -15,6 +15,36 @@ interface AdminDashboardProps {
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onViewPublicDashboard }) => {
+  const [users, setUsers] = useState(initialUsers);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const filteredUsers = useMemo(() => {
+    const term = searchTerm.trim().toLocaleLowerCase('pt-BR');
+    return users.filter((user) =>
+      `${user.name} ${user.email}`.toLocaleLowerCase('pt-BR').includes(term),
+    );
+  }, [searchTerm, users]);
+
+  const addUser = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setUsers((current) => [
+      ...current,
+      {
+        id: String(Date.now()),
+        name: newUserName.trim(),
+        email: newUserEmail.trim(),
+        role: 'Usuário',
+        status: 'Ativo',
+        lastAccess: 'Ainda não acessou',
+      },
+    ]);
+    setNewUserName('');
+    setNewUserEmail('');
+    setIsAddDialogOpen(false);
+  };
+
   return (
     <div className="min-h-screen w-full bg-[#07150E] font-sans flex flex-col items-center pb-12">
       
@@ -51,6 +81,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onView
             </div>
             <input 
               type="text" 
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
               placeholder="Busque por um usuário aqui..." 
               className="w-[280px] h-full bg-transparent text-[#F2FAF5] placeholder-[#8FA89B] text-[15px] outline-none pr-[16px]" 
             />
@@ -69,7 +101,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onView
         
         {/* Barra de Ferramentas */}
         <div className="w-full flex flex-wrap justify-between items-center gap-4">
-          <button className="h-[40px] px-4 rounded-[10px] border-[1.5px] border-[#14C45A] text-[#14C45A] hover:bg-[#14C45A]/10 flex items-center gap-2 font-medium transition-colors whitespace-nowrap shrink-0">
+          <button
+            type="button"
+            onClick={() => setIsAddDialogOpen(true)}
+            aria-label="Adicionar novo usuário"
+            className="h-[40px] px-4 rounded-[10px] border-[1.5px] border-[#14C45A] text-[#14C45A] hover:bg-[#14C45A]/10 flex items-center gap-2 font-medium transition-colors whitespace-nowrap shrink-0"
+          >
             <span>+</span> Adicionar novo usuário
           </button>
           
@@ -85,7 +122,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onView
 
         {/* Lista de Utilizadores */}
         <div className="flex flex-col gap-4">
-          {users.map((user) => {
+          {filteredUsers.map((user) => {
             const isActive = user.status === 'Ativo';
             
             return (
@@ -158,6 +195,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onView
               </div>
             );
           })}
+          {filteredUsers.length === 0 && (
+            <p className="rounded-xl border border-[#385E47] p-6 text-center text-[#9DB0A4]">
+              Nenhum usuário encontrado.
+            </p>
+          )}
         </div>
 
         {/* Rodapé com botões de Saída */}
@@ -171,6 +213,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onView
         </div>
 
       </main>
+
+      {isAddDialogOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="add-user-title"
+          className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/70 p-4"
+        >
+          <form onSubmit={addUser} className="w-full max-w-md space-y-4 rounded-2xl border border-[#2FA862] bg-[#0E2218] p-6">
+            <h2 id="add-user-title" className="text-xl font-semibold text-white">Adicionar usuário</h2>
+            <label className="flex flex-col gap-1 text-sm text-[#D4E3DA]">
+              Nome
+              <input
+                autoFocus
+                required
+                value={newUserName}
+                onChange={(event) => setNewUserName(event.target.value)}
+                className="rounded-lg border border-[#4A6B57] bg-[#07150E] px-3 py-2 text-white"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm text-[#D4E3DA]">
+              E-mail
+              <input
+                type="email"
+                required
+                value={newUserEmail}
+                onChange={(event) => setNewUserEmail(event.target.value)}
+                className="rounded-lg border border-[#4A6B57] bg-[#07150E] px-3 py-2 text-white"
+              />
+            </label>
+            <div className="flex justify-end gap-3">
+              <button type="button" onClick={() => setIsAddDialogOpen(false)} className="rounded-lg border border-[#4A6B57] px-4 py-2 text-white">
+                Cancelar
+              </button>
+              <button type="submit" className="rounded-lg bg-[#1F8A4C] px-4 py-2 font-semibold text-white">
+                Salvar usuário
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 };

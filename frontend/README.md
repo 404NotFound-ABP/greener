@@ -16,6 +16,10 @@ npm run dev
 
 Abra o endereço que o Vite imprimir no terminal. Na mesma pasta, `npm run build` verifica o TypeScript e gera os arquivos em `dist/`. `npm run lint` executa o ESLint. Os dois comandos passaram no commit `1e075b9`.
 
+## Histórico de coletas
+
+A página consulta `GET /api/coleta/historico` e usa `servidorId` para filtrar por serviço. Como a rota atual não aceita datas, a seleção do período é aplicada no frontend aos até 10.000 registros mais recentes retornados pela API. A URL base padrão é `http://localhost:3001/api`; para outro endereço, defina `VITE_API_URL` antes de iniciar o Vite ou gerar o build.
+
 ## O que demonstrar na Sprint 2
 
 | Fluxo | Comportamento observado em 06/11/2026 |
