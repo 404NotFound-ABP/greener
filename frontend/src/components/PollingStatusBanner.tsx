@@ -5,6 +5,7 @@ interface PollingStatusBannerProps {
   isStale: boolean;
   isRefreshing: boolean;
   lastUpdate: string;
+  hasData?: boolean;
   onRetry: () => void | Promise<void>;
 }
 
@@ -23,6 +24,7 @@ export const PollingStatusBanner: React.FC<PollingStatusBannerProps> = ({
   isStale,
   isRefreshing,
   lastUpdate,
+  hasData = true,
   onRetry,
 }) => {
   // Não renderiza nada enquanto os dados estiverem atualizados e sem falhas
@@ -51,7 +53,9 @@ export const PollingStatusBanner: React.FC<PollingStatusBannerProps> = ({
               : 'Os dados exibidos podem estar desatualizados.'}
           </span>{' '}
           <span className="opacity-90">
-            Exibindo o último registro válido obtido às <strong>{lastUpdate}</strong>.
+            {hasData
+              ? <>Exibindo o último registro válido obtido às <strong>{lastUpdate}</strong>.</>
+              : 'Ainda não há indicadores válidos carregados.'}
           </span>
         </div>
       </div>

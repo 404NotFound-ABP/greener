@@ -17,7 +17,7 @@ describe('modal de serviço', () => {
 
     expect(screen.getByText('Servidor Centro')).toBeInTheDocument();
     expect(screen.getByText('Cidade: São Paulo')).toBeInTheDocument();
-    expect(screen.getByText('Indicadores ambientais')).toBeInTheDocument();
+    expect(screen.getByText('Métricas disponíveis')).toBeInTheDocument();
     expect(screen.getByText('CPU')).toBeInTheDocument();
     expect(screen.getByText('Armazenamento')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ver dashboard completo' })).toBeInTheDocument();
@@ -26,10 +26,22 @@ describe('modal de serviço', () => {
   });
 
   it('distingue serviço indisponível e último valor conhecido', () => {
-    render(<ServiceModal service={servico('indisponível')} />);
+    render(
+      <ServiceModal
+        service={{
+          ...servico('indisponível'),
+          kwh: 12.5,
+          co2: 45,
+          lastUpdate: '12:00:00',
+        }}
+      />
+    );
 
     expect(screen.getAllByText(/indisponível/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/Última leitura registrada/)).toBeInTheDocument();
+    expect(screen.getByText('Valores da última atualização')).toBeInTheDocument();
+    expect(screen.getByText('12,5 kWh')).toBeInTheDocument();
+    expect(screen.getByText('45 gCO₂e')).toBeInTheDocument();
+    expect(screen.getByText('Última atualização: 12:00:00')).toBeInTheDocument();
   });
 
   it('não apresenta métricas simuladas como reais quando não há dados', () => {

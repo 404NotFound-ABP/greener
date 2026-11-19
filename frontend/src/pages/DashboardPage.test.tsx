@@ -1,77 +1,219 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardPage } from './DashboardPage';
+import type { DashboardService, DashboardSummary } from '../hooks/useDashboardSummary';
 
 vi.mock('../components/ServiceModal', () => ({
   ServiceModal: ({ service }: { service: { name: string } }) => <div>Detalhes: {service.name}</div>,
 }));
 
+const summary: DashboardSummary = {
+  total_servidores: 3,
+  disponiveis: 1,
+  indisponiveis: 1,
+  servidores_com_metricas: 2,
+  servidores_sem_metricas: 1,
+  cobertura_parcial: true,
+  periodo_inicio: '2026-11-01T10:00:00.000Z',
+  periodo_fim: '2026-11-15T10:00:00.000Z',
+  janela_amostragem_segundos: 2_592_000,
+  intervalo_atualizacao_segundos: 300,
+  consumo_total_acumulado_kwh: 123.45,
+  emissoes_total_acumuladas_gco2e: 678.9,
+};
+
+const services: DashboardService[] = [
+  {
+    id: 'billing-api',
+    nome: 'Billing API',
+    status: 'disponivel',
+    regiao: { pais: 'Brasil', regiao: 'Sudeste', cidade: 'São Paulo' },
+    ultima_coleta: {
+      potencia_watts: 42.1,
+      energia_kwh: 10.25,
+      emissoes_gco2e: 123.4,
+      coletado_em: '2026-11-15T10:00:00.000Z',
+    },
+  },
+  {
+    id: 'search-worker',
+    nome: 'Search Worker',
+    status: 'indisponivel',
+    regiao: { pais: 'Brasil', regiao: 'Sul', cidade: 'Curitiba' },
+    ultima_coleta: {
+      potencia_watts: 15,
+      energia_kwh: null,
+      emissoes_gco2e: null,
+      coletado_em: '2026-11-14T10:00:00.000Z',
+    },
+  },
+  {
+    id: 'empty-service',
+    nome: 'Empty Service',
+    status: 'sem_metricas',
+    regiao: null,
+    ultima_coleta: null,
+  },
+];
+
+function stubDashboardApi(
+  dashboardSummary = summary,
+  dashboardServices: DashboardService[] = services
+) {
+  const buscar = vi.fn((input: RequestInfo | URL) => {
+    const url = String(input);
+    const payload = url.endsWith('/servidores/dashboard')
+      ? { resumo: dashboardSummary, servidores: dashboardServices }
+      : url.endsWith('/servidores')
+        ? dashboardServices.map(({ id, nome }) => ({ id, nome }))
+        : [];
+    return Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve(payload),
+    });
+  });
+  vi.stubGlobal('fetch', buscar);
+  return buscar;
+}
+
 describe('DashboardPage', () => {
+  beforeEach(() => {
+    stubDashboardApi();
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it('mostra a lista de serviços e unidades dos indicadores', () => {
-    // Arrange
+  it('mostra indicadores integrados, período e cobertura parcial', async () => {
+    const buscar = stubDashboardApi();
     render(<DashboardPage />);
 
-    // Act
-    const tabela = screen.getByRole('table');
-
-    // Assert
-    expect(tabela).toHaveTextContent('ASTAH-XYZ');
-    expect(tabela).toHaveTextContent('Consumo no período (kWh)');
-    expect(tabela).toHaveTextContent('Emissão no período (kgCO₂e)');
+    const energia = screen.getByRole('article', { name: 'Energia total' });
+    await waitFor(() => expect(energia).toHaveTextContent('123,45 kWh'));
+    await waitFor(() =>
+      expect(screen.getByRole('article', { name: 'Emissão total' })).toHaveTextContent(
+        '678,9 gCO₂e'
+      )
+    );
+    expect(screen.getByRole('article', { name: 'Serviços ativos' })).toHaveTextContent('1');
+    expect(screen.getByRole('article', { name: 'Serviços indisponíveis' })).toHaveTextContent('1');
+    expect(screen.getByText(/Período das coletas:/)).toHaveTextContent('janela de 1 mês (30d)');
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Totais parciais: métricas disponíveis para 2 de 3 serviços; 1 sem métricas.'
+    );
+    expect(screen.getByText(/demonstração simulada/)).toBeInTheDocument();
+    expect(buscar).toHaveBeenCalledWith(
+      'http://localhost:3001/api/servidores/dashboard',
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
   });
 
-  it('seleciona outro serviço para a comparação', () => {
-    // Arrange
+  it('não transforma métricas ausentes em zero', async () => {
+    stubDashboardApi({
+      ...summary,
+      consumo_total_acumulado_kwh: null,
+      emissoes_total_acumuladas_gco2e: null,
+    });
     render(<DashboardPage />);
 
-    // Act
-    fireEvent.click(screen.getAllByRole('button', { name: 'Selecionar ASTAH-ABC para comparação' })[0]);
-
-    // Assert
-    expect(screen.getByText('4 de 5 selecionados')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole('article', { name: 'Energia total' })).toHaveTextContent(
+        'Indisponível'
+      )
+    );
+    expect(screen.getByRole('article', { name: 'Emissão total' })).toHaveTextContent('Indisponível');
   });
 
-  it('filtra os serviços pelo texto pesquisado', () => {
-    // Arrange
+  it('mostra identificadores e métricas reais da última coleta com as unidades da API', async () => {
     render(<DashboardPage />);
 
-    // Act
+    const tabela = await screen.findByRole('table');
+
+    expect(tabela).toHaveTextContent('Billing API');
+    expect(tabela).toHaveTextContent('ID: billing-api');
+    expect(tabela).toHaveTextContent('10,25');
+    expect(tabela).toHaveTextContent('123,4');
+    expect(tabela).toHaveTextContent('Energia na última coleta (kWh)');
+    expect(tabela).toHaveTextContent('Emissão na última coleta (gCO₂e)');
+    expect(tabela).not.toHaveTextContent('ASTAH-XYZ');
+  });
+
+  it('preserva métricas nulas e informa quando não há leitura', async () => {
+    render(<DashboardPage />);
+
+    const tabela = await screen.findByRole('table');
+    const workerRow = screen.getByRole('row', { name: /Search Worker/ });
+    const emptyRow = screen.getByRole('row', { name: /Empty Service/ });
+
+    expect(workerRow).toHaveTextContent('Indisponível');
+    expect(emptyRow).toHaveTextContent('Indisponível');
+    expect(tabela).toHaveTextContent('Sem leitura');
+  });
+
+  it('filtra os serviços pelo nome e identificador vindos da API', async () => {
+    render(<DashboardPage />);
+
     fireEvent.change(screen.getByPlaceholderText('Pesquise por um serviço aqui'), {
-      target: { value: 'ASTAH-XYZ' },
+      target: { value: 'billing-api' },
     });
 
-    // Assert
-    expect(screen.getByRole('row', { name: /ASTAH-XYZ/ })).toBeInTheDocument();
-    expect(screen.queryByRole('row', { name: /ASTAH-ABC/ })).not.toBeInTheDocument();
+    expect(await screen.findByRole('row', { name: /Billing API/ })).toBeInTheDocument();
+    expect(screen.queryByRole('row', { name: /Search Worker/ })).not.toBeInTheDocument();
   });
 
-  it('mantém a lista de demonstração visível sem disparar chamadas HTTP', async () => {
-    // Arrange
-    const buscar = vi.fn();
-    vi.stubGlobal('fetch', buscar);
+  it('preenche e aplica os filtros geográficos com dados da API', async () => {
+    render(<DashboardPage />);
+    await screen.findByRole('table');
 
-    // Act
+    fireEvent.click(screen.getByRole('button', { name: 'Todas as regiões' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sul' }));
+
+    expect(screen.getByRole('row', { name: /Search Worker/ })).toBeInTheDocument();
+    expect(screen.queryByRole('row', { name: /Billing API/ })).not.toBeInTheDocument();
+  });
+
+  it('informa quando a busca não encontra serviços', async () => {
     render(<DashboardPage />);
 
-    // Assert
-    expect(screen.getByRole('table')).toHaveTextContent('ASTAH-XYZ');
-    await waitFor(() => expect(buscar).not.toHaveBeenCalled());
+    fireEvent.change(screen.getByPlaceholderText('Pesquise por um serviço aqui'), {
+      target: { value: 'serviço-inexistente' },
+    });
+
+    expect(await screen.findByText('Nenhum serviço encontrado')).toBeInTheDocument();
+  });
+
+  it('não mostra exemplos fixos durante o carregamento da API', async () => {
+    const buscar = stubDashboardApi();
+    render(<DashboardPage />);
+
+    expect(screen.getByText('Carregando serviços')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(buscar).toHaveBeenCalledWith(
+        'http://localhost:3001/api/servidores/dashboard',
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      )
+    );
+    const row = await screen.findByRole('row', { name: /Billing API/ });
+    expect(row).toBeInTheDocument();
+    expect(screen.getByRole('table')).not.toHaveTextContent('ASTAH-XYZ');
+  });
+
+  it('informa quando a API retorna uma lista vazia', async () => {
+    stubDashboardApi(summary, []);
+    render(<DashboardPage />);
+
+    expect(await screen.findByText('A API não retornou serviços')).toBeInTheDocument();
+  });
+
+  it('abre os detalhes usando o identificador real do serviço', async () => {
+    render(<DashboardPage />);
+
+    fireEvent.click(await screen.findByRole('row', { name: /Billing API/ }));
+    expect(await screen.findByText('Detalhes: Billing API')).toBeInTheDocument();
   });
 
   it('abre e fecha a página de comparação de serviços', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() =>
-        Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve([{ id: 'api-a', nome: 'Serviço A' }])
-        })
-      )
-    );
     render(<DashboardPage />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Comparar serviços' }));

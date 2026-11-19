@@ -165,7 +165,10 @@ export const AccountSettingsPage: React.FC<AccountSettingsPageProps> = ({ onBack
   }, []);
 
   useEffect(() => {
-    void fetchIntervalsAndStatus();
+    const timeoutId = window.setTimeout(() => {
+      void fetchIntervalsAndStatus();
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, [fetchIntervalsAndStatus]);
 
   const showToast = (msg: string) => {

@@ -12,7 +12,7 @@ import type { ServiceData } from '../types/service';
 import { matchesServiceStatus } from '../config/statusConfig';
 import {
   CallbackServiceRepository,
-  defaultServiceRepository,
+  HttpServiceRepository,
   type ServiceRepository
 } from '../adapters/serviceAdapter';
 import { useServicesPolling } from '../hooks/useServicesPolling';
@@ -26,6 +26,8 @@ export interface MapBackgroundProps {
 
 const DEFAULT_CENTER: [number, number] = [-23.3053, -45.9658];
 const DEFAULT_ZOOM = 13;
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api').replace(/\/+$/, '');
+const mapServiceRepository = new HttpServiceRepository(`${API_BASE_URL}/servidores`);
 
 const themes = {
   dark: {
@@ -68,7 +70,7 @@ function parseCoordNumber(value: unknown): number | null {
  * Extrai e valida coordenadas de múltiplos formatos possíveis vindos da API.
  * Retorna null quando ausentes, nulas, vazias ou fora da faixa geográfica válida.
  */
-export function extractValidCoordinates(service: ServiceData): [number, number] | null {
+function extractValidCoordinates(service: ServiceData): [number, number] | null {
   const raw = service as ServiceData & {
     coordenadas?:
       | {
@@ -136,7 +138,7 @@ export function extractValidCoordinates(service: ServiceData): [number, number] 
 /**
  * Formata a localização textual tratando ausência parcial ou total de cidade, região e país (T23.2/US10).
  */
-export function formatServiceLocation(localizacao?: {
+function formatServiceLocation(localizacao?: {
   cidade?: string | null;
   regiao?: string | null;
   pais?: string | null;
@@ -219,6 +221,7 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
   const [tileRetryKey, setTileRetryKey] = useState(0);
   const [selectedListService, setSelectedListService] = useState<ServiceData | null>(null);
   const [isEmptyBannerDismissed, setIsEmptyBannerDismissed] = useState(false);
+  const [hiddenServiceIds, setHiddenServiceIds] = useState<ReadonlySet<string>>(() => new Set());
 
   const [activeFilters, setActiveFilters] = useState({
     ativo: true,
@@ -229,10 +232,14 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
   const resolvedRepository = useMemo<ServiceRepository>(() => {
     if (repository) return repository;
     if (onFetchServices) return new CallbackServiceRepository(onFetchServices);
-    return defaultServiceRepository;
+    return mapServiceRepository;
   }, [repository, onFetchServices]);
 
-  const pollingState = useServicesPolling({ repository: resolvedRepository });
+  const pollingState = useServicesPolling({
+    repository: resolvedRepository,
+    initialServices: [],
+    loadPollingIntervalFromApi: true
+  });
   const { services, isRefreshing, hasError, triggerRefresh } = pollingState;
 
   useEffect(() => {
@@ -331,6 +338,19 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
 
     return { mappableMarkers: valid, servicesWithoutCoordsCount: missingCoords };
   }, [filteredServices]);
+  const visibleMarkers = mappableMarkers.filter(({ service }) => !hiddenServiceIds.has(service.id));
+
+  const handleToggleServiceMarker = (service: ServiceData) => {
+    setHiddenServiceIds(current => {
+      const next = new Set(current);
+      if (next.has(service.id)) {
+        next.delete(service.id);
+      } else {
+        next.add(service.id);
+      }
+      return next;
+    });
+  };
 
   const handleSelectServiceFromList = (service: ServiceData) => {
     const coords = extractValidCoordinates(service);
@@ -392,6 +412,8 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
         repository={resolvedRepository}
         pollingState={pollingState}
         onSelectService={handleSelectServiceFromList}
+        hiddenServiceIds={hiddenServiceIds}
+        onToggleServiceMarker={handleToggleServiceMarker}
       />
 
       <style>{`
@@ -420,6 +442,9 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
           key={`${currentTheme}-${tileRetryKey}`}
           attribution={themes[currentTheme].attribution}
           url={themes[currentTheme].url}
+          maxZoom={19}
+          updateWhenZooming={false}
+          keepBuffer={2}
           eventHandlers={{
             tileerror: () => setTileErrorCount(prev => prev + 1),
             tileload: () => {
@@ -428,7 +453,7 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
           }}
         />
 
-        {mappableMarkers.map(({ service, modalData, coords }) => (
+        {visibleMarkers.map(({ service, modalData, coords }) => (
           <CircleMarker
             key={service.id}
             ref={el => {

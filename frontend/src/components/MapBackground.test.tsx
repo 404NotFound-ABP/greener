@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('react-leaflet', () => ({
@@ -27,43 +27,48 @@ vi.mock('react-leaflet', () => ({
   useMap: () => ({ closePopup: vi.fn() }),
 }));
 
-vi.mock('../hooks/useServicesPolling', () => ({
-  useServicesPolling: () => ({
-    services: [
-      {
-        id: '1',
-        nome: 'Serviço Jacareí',
-        status: 'Ativo',
-        localizacao: { pais: 'Brasil', regiao: 'Sudeste', cidade: 'Jacareí' },
-        valores: { kwh: 10, gco2e: 4.5 },
-        coords: [-23.3053, -45.9658],
-      },
-      {
-        id: '2',
-        nome: 'Serviço Caçapava',
-        status: 'Indisponível',
-        localizacao: { pais: 'Brasil', regiao: 'Sudeste', cidade: 'Caçapava' },
-        valores: { kwh: 10, gco2e: 0 },
-        coords: [-23.100, -45.700],
-      },
-      {
-        id: '3',
-        nome: 'Serviço Taubaté',
-        status: 'Sem métrica',
-        localizacao: { pais: 'Brasil', regiao: 'Sudeste', cidade: 'Taubaté' },
-        valores: { kwh: 12, gco2e: 5.4 },
-        coords: [-23.020, -45.550],
-      },
-    ],
-    lastUpdate: '12:00:00',
-    isPaused: false,
-    isRefreshing: false,
-    hasError: false,
-    isStale: false,
-    togglePause: vi.fn(),
-    triggerRefresh: vi.fn(),
-  }),
-}));
+vi.mock('../hooks/useServicesPolling', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../hooks/useServicesPolling')>();
+
+  return {
+    ...actual,
+    useServicesPolling: () => ({
+      services: [
+        {
+          id: '1',
+          nome: 'Serviço Jacareí',
+          status: 'Ativo',
+          localizacao: { pais: 'Brasil', regiao: 'Sudeste', cidade: 'Jacareí' },
+          valores: { kwh: 10, gco2e: 4.5 },
+          coords: [-23.3053, -45.9658],
+        },
+        {
+          id: '2',
+          nome: 'Serviço Caçapava',
+          status: 'Indisponível',
+          localizacao: { pais: 'Brasil', regiao: 'Sudeste', cidade: 'Caçapava' },
+          valores: { kwh: 10, gco2e: 0 },
+          coords: [-23.100, -45.700],
+        },
+        {
+          id: '3',
+          nome: 'Serviço Taubaté',
+          status: 'Sem métrica',
+          localizacao: { pais: 'Brasil', regiao: 'Sudeste', cidade: 'Taubaté' },
+          valores: { kwh: 12, gco2e: 5.4 },
+          coords: [-23.020, -45.550],
+        },
+      ],
+      lastUpdate: '12:00:00',
+      isPaused: false,
+      isRefreshing: false,
+      hasError: false,
+      isStale: false,
+      togglePause: vi.fn(),
+      triggerRefresh: vi.fn(),
+    }),
+  };
+});
 
 import { MapBackground } from './MapBackground';
 
@@ -130,8 +135,9 @@ describe('MapBackground', () => {
 
     fireEvent.click(screen.getAllByText('Localização')[2]);
 
-    expect(screen.getByRole('dialog', { name: 'Detalhes de Serviço Taubaté' })).toBeInTheDocument();
-    expect(screen.getAllByText(/Cidade: Taubaté, Sudeste, Brasil/)).toHaveLength(2);
+    const dialog = screen.getByRole('dialog', { name: 'Detalhes de Serviço Taubaté' });
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getByText('Cidade: Taubaté')).toBeInTheDocument();
   });
 
   it('permite trocar o tema visual do mapa', () => {
@@ -152,7 +158,7 @@ describe('MapBackground', () => {
     expect(screen.getByTitle('Mudar para Escuro')).toBeInTheDocument();
     expect(screen.getByAltText('Prévia Escuro')).toHaveAttribute(
       'src',
-      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/13/4641/3050'
+      'https://tile.openstreetmap.org/13/3050/4641.png'
     );
   });
 });

@@ -69,7 +69,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return defaultServiceRepository;
   }, [repository, onFetchServices]);
 
-  const internalPolling = useServicesPolling({ repository: resolvedRepository });
+  const internalPolling = useServicesPolling({
+    repository: resolvedRepository,
+    enabled: !pollingState
+  });
   const {
     services,
     lastUpdate,

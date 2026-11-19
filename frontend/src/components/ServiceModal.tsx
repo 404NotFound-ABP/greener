@@ -168,7 +168,10 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
   }, [service.id, initialHistory, isSemMetricas]);
 
   useEffect(() => {
-    void fetchServiceHistory();
+    const timeoutId = window.setTimeout(() => {
+      void fetchServiceHistory();
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, [fetchServiceHistory]);
 
   const chartPoints = useMemo<NormalizedPoint[]>(() => {
@@ -210,16 +213,14 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
     }));
   }, [history]);
 
-  useEffect(() => {
-    if (chartPoints.length > 0) {
-      setActivePointIndex(chartPoints.length - 1);
-    } else {
-      setActivePointIndex(null);
-    }
-  }, [chartPoints.length]);
-
   const latestPoint = chartPoints.length > 0 ? chartPoints[chartPoints.length - 1] : null;
   const firstPoint = chartPoints.length > 0 ? chartPoints[0] : null;
+  const activeChartPointIndex =
+    chartPoints.length === 0
+      ? null
+      : activePointIndex === null || activePointIndex >= chartPoints.length
+        ? chartPoints.length - 1
+        : activePointIndex;
 
   const computedPeriodLabel = useMemo(() => {
     if (chartPoints.length >= 2 && firstPoint && latestPoint) {
@@ -375,8 +376,10 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
   }, [chartPoints, selectedMetric, unitLabel]);
 
   const inspectedPoint =
-    chartGeometry && activePointIndex !== null && chartGeometry.coords[activePointIndex]
-      ? chartGeometry.coords[activePointIndex]
+    chartGeometry &&
+    activeChartPointIndex !== null &&
+    chartGeometry.coords[activeChartPointIndex]
+      ? chartGeometry.coords[activeChartPointIndex]
       : null;
 
   const renderChartSection = () => (
@@ -531,7 +534,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
               )}
 
               {chartGeometry.coords.map((pt, idx) => {
-                const isSelected = activePointIndex === idx;
+                const isSelected = activeChartPointIndex === idx;
                 const isFirst = idx === 0;
                 const isLast = idx === chartGeometry.coords.length - 1;
                 const placeLabelBelow = pt.y < chartGeometry.padTop + 13;

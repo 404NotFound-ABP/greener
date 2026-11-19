@@ -35,10 +35,27 @@ export interface ExternalServicePayload {
     lat?: number | null;
     lng?: number | null;
   } | null;
+  regiao?: {
+    pais?: string | null;
+    regiao?: string | null;
+    cidade?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+  } | null;
+  ultima_coleta?: {
+    coletado_em?: string | null;
+    potencia_watts?: number | null;
+    energia_kwh?: number | null;
+    emissoes_gco2e?: number | null;
+  } | null;
   valores?: {
     kwh?: number | null;
     gco2e?: number | null;
   } | null;
+}
+
+function parseMetric(value: number | null | undefined): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
 const sanitizeLocationField = (value?: string | null): string | undefined => {
@@ -58,8 +75,18 @@ function getCoordinates(raw: ExternalServicePayload): [number, number] | undefin
     latitude = raw.coordenadas.lat ?? raw.coordenadas.latitude;
     longitude = raw.coordenadas.lng ?? raw.coordenadas.longitude;
   } else {
-    latitude = raw.latitude ?? raw.lat ?? raw.localizacao?.latitude ?? raw.localizacao?.lat;
-    longitude = raw.longitude ?? raw.lng ?? raw.localizacao?.longitude ?? raw.localizacao?.lng;
+    latitude =
+      raw.latitude ??
+      raw.lat ??
+      raw.localizacao?.latitude ??
+      raw.localizacao?.lat ??
+      raw.regiao?.latitude;
+    longitude =
+      raw.longitude ??
+      raw.lng ??
+      raw.localizacao?.longitude ??
+      raw.localizacao?.lng ??
+      raw.regiao?.longitude;
   }
 
   if (
@@ -85,21 +112,30 @@ function getCoordinates(raw: ExternalServicePayload): [number, number] | undefin
 export class ServiceAdapter {
   static toDTO(raw: ExternalServicePayload): ServiceData {
     const coords = getCoordinates(raw);
+    const location = raw.localizacao ?? raw.regiao;
+    const hasLatestMetrics = raw.ultima_coleta?.potencia_watts != null;
+    const status =
+      raw.status?.toLowerCase().trim() === 'disponivel' && !hasLatestMetrics
+        ? 'Sem métrica'
+        : normalizeServiceStatus(raw.status);
 
     return {
       id: String(raw.id),
       nome: (raw.nome ?? raw.name ?? 'Serviço sem nome').trim(),
-      status: normalizeServiceStatus(raw.status),
+      status,
       ...(coords ? { coords } : {}),
       localizacao: {
-        pais: sanitizeLocationField(raw.localizacao?.pais),
-        regiao: sanitizeLocationField(raw.localizacao?.regiao),
-        cidade: sanitizeLocationField(raw.localizacao?.cidade)
+        pais: sanitizeLocationField(location?.pais),
+        regiao: sanitizeLocationField(location?.regiao),
+        cidade: sanitizeLocationField(location?.cidade)
       },
       valores: {
-        kwh: Number(raw.valores?.kwh ?? 0),
-        gco2e: Number(raw.valores?.gco2e ?? 0)
-      }
+        kwh: parseMetric(raw.valores?.kwh ?? raw.ultima_coleta?.energia_kwh),
+        gco2e: parseMetric(raw.valores?.gco2e ?? raw.ultima_coleta?.emissoes_gco2e)
+      },
+      ...(raw.ultima_coleta?.coletado_em
+        ? { ultimaAtualizacao: raw.ultima_coleta.coletado_em }
+        : {})
     };
   }
 

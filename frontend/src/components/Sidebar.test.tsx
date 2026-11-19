@@ -84,4 +84,22 @@ describe('Sidebar', () => {
     expect(screen.getAllByText('Serviço 1').length).toBeGreaterThan(0);
     expect(screen.queryAllByText('Serviço 2')).toHaveLength(0);
   });
+
+  it('combina a busca com o filtro de estado e restaura a lista ao limpar a busca', () => {
+    render(<SidebarControlada />);
+
+    const busca = screen.getByPlaceholderText('Busque por serviço ou localização');
+    fireEvent.change(busca, { target: { value: 'Serviço' } });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Ativo' })[0]);
+
+    expect(screen.queryAllByText('Serviço 1')).toHaveLength(0);
+    expect(screen.getAllByText('Serviço 2').length).toBeGreaterThan(0);
+
+    fireEvent.change(busca, { target: { value: 'não existe' } });
+    expect(screen.getAllByText('Nenhum serviço encontrado para os filtros ou busca atuais.').length).toBeGreaterThan(0);
+
+    fireEvent.change(busca, { target: { value: '' } });
+    expect(screen.queryAllByText('Serviço 1')).toHaveLength(0);
+    expect(screen.getAllByText('Serviço 2').length).toBeGreaterThan(0);
+  });
 });

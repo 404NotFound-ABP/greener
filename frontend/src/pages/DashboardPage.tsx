@@ -4,18 +4,37 @@ import { ServiceModal } from '../components/ServiceModal';
 
 import type { ModalServiceData } from '../components/ServiceModal';
 
-import { useServicesPolling } from '../hooks/useServicesPolling';
+import { formatIntervalLabel } from '../hooks/useServicesPolling';
+
+import {
+  useDashboardSummary,
+  type DashboardService,
+  type DashboardSummary,
+} from '../hooks/useDashboardSummary';
 
 import { PollingStatusBanner } from '../components/PollingStatusBanner';
 
 import { ServiceComparisonPage } from './ServiceComparisonPage';
 
+import { formatEnvironmentalMetric } from '../utils/environmentalMetrics';
+
 
 type ServiceStatus = 'Ativo' | 'Indisponível' | 'Sem métricas';
 
-
-
 interface DashboardServiceRow {
+  id: string;
+  name: string;
+  location: string;
+  country: string;
+  region: string;
+  city: string;
+  status: ServiceStatus;
+  consumptionKwh: number | null;
+  emissionsGco2e: number | null;
+  collectedAt: string | null;
+}
+
+interface DemoDashboardServiceRow {
 
   numericId: number;
 
@@ -49,7 +68,7 @@ interface DashboardServiceRow {
 
 
 
-const SERVICES_DATA: DashboardServiceRow[] = [
+const SIMULATED_CHART_DATA: DemoDashboardServiceRow[] = [
 
   {
 
@@ -309,35 +328,21 @@ const SERVICES_DATA: DashboardServiceRow[] = [
 
 ];
 
+function formatCollectionPeriod(summary: DashboardSummary): string {
+  const formatter = new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'short'
+  });
+  const dates = [summary.periodo_inicio, summary.periodo_fim]
+    .map(value => (value ? new Date(value) : null))
+    .filter((date): date is Date => date !== null && Number.isFinite(date.getTime()));
 
-
-const SUGGESTED_CITIES = [
-
-  'Jacareí',
-
-  'Caçapava',
-
-  'Taubaté',
-
-  'São Paulo',
-
-  'Mogi das cruzes',
-
-  'São Francisco',
-
-  'Berlim',
-
-  'Sydney',
-
-  'Toronto',
-
-  'Lisboa',
-
-  'Tóquio',
-
-  'Cidade do México',
-
-];
+  if (dates.length === 0) return 'Nenhuma coleta registrada';
+  if (dates.length === 1 || dates[0].getTime() === dates[1].getTime()) {
+    return formatter.format(dates[0]);
+  }
+  return `${formatter.format(dates[0])} – ${formatter.format(dates[1])}`;
+}
 
 
 
@@ -357,6 +362,43 @@ const SERIES_COLORS = [
 
 
 
+function mapApiServiceToRow(service: DashboardService): DashboardServiceRow {
+  const latest = service.ultima_coleta;
+  const rawStatus = service.status.toLowerCase();
+  const isUnavailable = ['indisponivel', 'indisponível', 'removido', 'unavailable'].includes(
+    rawStatus
+  );
+  const isMissingMetrics = ['sem_metricas', 'sem métricas', 'no-metrics'].includes(rawStatus);
+  const hasMetrics = Boolean(
+    latest &&
+      [latest.potencia_watts, latest.energia_kwh, latest.emissoes_gco2e].some(
+        value => value !== null
+      )
+  );
+  const status: ServiceStatus = isUnavailable
+    ? 'Indisponível'
+    : isMissingMetrics || !hasMetrics
+      ? 'Sem métricas'
+      : 'Ativo';
+  const country = service.regiao?.pais ?? '';
+  const region = service.regiao?.regiao ?? '';
+  const city = service.regiao?.cidade ?? '';
+  const location = [city, region, country].filter(Boolean).join(' - ');
+
+  return {
+    id: service.id,
+    name: service.nome || service.id,
+    location: location || 'Localização não informada',
+    country,
+    region,
+    city,
+    status,
+    consumptionKwh: latest?.energia_kwh ?? null,
+    emissionsGco2e: latest?.emissoes_gco2e ?? null,
+    collectedAt: latest?.coletado_em ?? null,
+  };
+}
+
 function mapServiceRowToModalData(row: DashboardServiceRow): ModalServiceData {
 
   const normalizedStatus: ModalServiceData['status'] =
@@ -375,19 +417,21 @@ function mapServiceRowToModalData(row: DashboardServiceRow): ModalServiceData {
 
   return {
 
-    id: row.numericId,
-
-    name: row.code,
-
+    id: row.id,
+    name: row.name,
     status: normalizedStatus,
-
     location: row.location,
-
+    kwh: row.consumptionKwh,
+    co2: row.emissionsGco2e,
+    lastUpdate: row.collectedAt ?? undefined,
   };
-
 }
 
-
+function formatCollectedAt(value: string | null): string {
+  if (!value) return 'Sem leitura';
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toLocaleString('pt-BR') : 'Data inválida';
+}
 
 function buildSmoothSvgPath(points: Array<{ x: number; y: number }>): string {
 
@@ -676,19 +720,11 @@ export const DashboardPage: React.FC = () => {
   const [isComparingServices, setIsComparingServices] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState('');
-
   const [countryFilter, setCountryFilter] = useState('');
-
   const [regionFilter, setRegionFilter] = useState('');
-
-  const [stateFilter, setStateFilter] = useState('');
-
   const [cityQuery, setCityQuery] = useState('');
-
   const [openFilterMenu, setOpenFilterMenu] = useState<
-
-    'country' | 'region' | 'state' | 'city' | 'period' | null
-
+    'country' | 'region' | 'city' | null
   >(null);
 
 
@@ -707,14 +743,8 @@ export const DashboardPage: React.FC = () => {
 
   ]);
 
-  const [periodFilter, setPeriodFilter] = useState<'7d' | '30d' | '90d'>('30d');
-
   const [sortMode, setSortMode] = useState<'alpha' | 'value'>('value');
-
   const [sortMetric, setSortMetric] = useState<'emission' | 'energy'>('energy');
-
-  const [currentPage, setCurrentPage] = useState(1);
-
   const [selectedServiceModal, setSelectedServiceModal] = useState<ModalServiceData | null>(null);
 
   const [chartTooltip, setChartTooltip] = useState<{
@@ -729,10 +759,6 @@ export const DashboardPage: React.FC = () => {
 
 
   const filtersContainerRef = useRef<HTMLDivElement | null>(null);
-
-  const periodDropdownRef = useRef<HTMLDivElement | null>(null);
-
-
 
   const {
 
@@ -750,7 +776,40 @@ export const DashboardPage: React.FC = () => {
 
     triggerRefresh,
 
-  } = useServicesPolling();
+    summary,
+    services,
+    isInitialLoad,
+
+    pollingIntervalSeconds,
+
+  } = useDashboardSummary();
+
+  const indicatorCards = [
+    {
+      title: 'Energia total',
+      value: summary
+        ? formatEnvironmentalMetric(summary.consumo_total_acumulado_kwh, 'kWh').displayWithUnit
+        : isInitialLoad
+          ? 'Carregando…'
+          : 'Indisponível'
+    },
+    {
+      title: 'Emissão total',
+      value: summary
+        ? formatEnvironmentalMetric(summary.emissoes_total_acumuladas_gco2e, 'gCO₂e').displayWithUnit
+        : isInitialLoad
+          ? 'Carregando…'
+          : 'Indisponível'
+    },
+    {
+      title: 'Serviços ativos',
+      value: summary ? summary.disponiveis.toLocaleString('pt-BR') : '—'
+    },
+    {
+      title: 'Serviços indisponíveis',
+      value: summary ? summary.indisponiveis.toLocaleString('pt-BR') : '—'
+    }
+  ];
 
 
 
@@ -759,19 +818,11 @@ export const DashboardPage: React.FC = () => {
 
 
   useEffect(() => {
-
     const handleClickOutside = (event: MouseEvent) => {
-
       const target = event.target as Node;
-
       const insideGeo = filtersContainerRef.current?.contains(target);
-
-      const insidePeriod = periodDropdownRef.current?.contains(target);
-
-      if (!insideGeo && !insidePeriod) {
-
+      if (!insideGeo) {
         setOpenFilterMenu(null);
-
       }
 
     };
@@ -784,93 +835,28 @@ export const DashboardPage: React.FC = () => {
 
 
 
-  const countryOptions = useMemo(
+  const dashboardServices = useMemo(() => services.map(mapApiServiceToRow), [services]);
 
-    () => [
+  const countryOptions = useMemo(() => [
+    { label: 'Todos os países', value: '' },
+    ...Array.from(new Set(dashboardServices.map(service => service.country).filter(Boolean))).map(
+      country => ({ label: country, value: country })
+    ),
+  ], [dashboardServices]);
 
-      { label: 'Todos os países', value: '' },
-
-      ...Array.from(new Set(SERVICES_DATA.map((s) => s.country))).map((c) => ({
-
-        label: c,
-
-        value: c,
-
-      })),
-
-    ],
-
-    []
-
-  );
-
-
-
-  const regionOptions = useMemo(
-
-    () => [
-
-      { label: 'Todas as regiões', value: '' },
-
-      ...Array.from(new Set(SERVICES_DATA.map((s) => s.region))).map((r) => ({
-
-        label: r,
-
-        value: r,
-
-      })),
-
-    ],
-
-    []
-
-  );
-
-
-
-  const stateOptions = useMemo(
-
-    () => [
-
-      { label: 'Todos os estados', value: '' },
-
-      ...Array.from(new Set(SERVICES_DATA.map((s) => s.state))).map((st) => ({
-
-        label: st,
-
-        value: st,
-
-      })),
-
-    ],
-
-    []
-
-  );
-
-
-
-  const periodOptions = [
-
-    { label: 'Últimos 7 dias', value: '7d' },
-
-    { label: 'Últimos 30 dias', value: '30d' },
-
-    { label: 'Últimos 90 dias', value: '90d' },
-
-  ];
-
-
+  const regionOptions = useMemo(() => [
+    { label: 'Todas as regiões', value: '' },
+    ...Array.from(new Set(dashboardServices.map(service => service.region).filter(Boolean))).map(
+      region => ({ label: region, value: region })
+    ),
+  ], [dashboardServices]);
 
   const filteredCityOptions = useMemo(() => {
-
     const q = cityQuery.toLowerCase().trim();
-
-    if (!q) return SUGGESTED_CITIES.slice(0, 5);
-
-    return SUGGESTED_CITIES.filter((city) => city.toLowerCase().includes(q));
-
-  }, [cityQuery]);
+    const cities = Array.from(new Set(dashboardServices.map(service => service.city).filter(Boolean)));
+    if (!q) return cities.slice(0, 5);
+    return cities.filter(city => city.toLowerCase().includes(q));
+  }, [cityQuery, dashboardServices]);
 
 
 
@@ -882,66 +868,35 @@ export const DashboardPage: React.FC = () => {
 
 
 
-    const filtered = SERVICES_DATA.filter((row) => {
-
+    const filtered = dashboardServices.filter((row) => {
       const matchesSearch =
-
         !term ||
-
-        row.code.toLowerCase().includes(term) ||
-
-        row.subId.toLowerCase().includes(term) ||
-
+        row.name.toLowerCase().includes(term) ||
+        row.id.toLowerCase().includes(term) ||
         row.location.toLowerCase().includes(term);
-
       const matchesCountry = !countryFilter || row.country === countryFilter;
-
       const matchesRegion = !regionFilter || row.region === regionFilter;
-
-      const matchesState = !stateFilter || row.state === stateFilter;
-
       const matchesCity = !cityTerm || row.city.toLowerCase().includes(cityTerm);
 
-
-
-      return matchesSearch && matchesCountry && matchesRegion && matchesState && matchesCity;
-
+      return matchesSearch && matchesCountry && matchesRegion && matchesCity;
     });
-
-
 
     return [...filtered].sort((a, b) => {
-
       if (sortMode === 'alpha') {
-
-        return a.code.localeCompare(b.code);
-
+        return a.name.localeCompare(b.name);
       }
-
-      const valA = sortMetric === 'energy' ? (a.consumptionKwh ?? -1) : (a.emissionKg ?? -1);
-
-      const valB = sortMetric === 'energy' ? (b.consumptionKwh ?? -1) : (b.emissionKg ?? -1);
-
+      const valA = sortMetric === 'energy' ? (a.consumptionKwh ?? -1) : (a.emissionsGco2e ?? -1);
+      const valB = sortMetric === 'energy' ? (b.consumptionKwh ?? -1) : (b.emissionsGco2e ?? -1);
       return valB - valA;
-
     });
-
-  }, [searchTerm, countryFilter, regionFilter, stateFilter, cityQuery, sortMode, sortMetric]);
-
-
+  }, [dashboardServices, searchTerm, countryFilter, regionFilter, cityQuery, sortMode, sortMetric]);
 
   const selectedServicesForChart = useMemo(
-
     () =>
-
       selectedServiceCodes
-
-        .map((code) => SERVICES_DATA.find((s) => s.code === code))
-
-        .filter((item): item is DashboardServiceRow => Boolean(item)),
-
+        .map((code) => SIMULATED_CHART_DATA.find((service) => service.code === code))
+        .filter((item): item is DemoDashboardServiceRow => Boolean(item)),
     [selectedServiceCodes]
-
   );
 
 
@@ -971,13 +926,8 @@ export const DashboardPage: React.FC = () => {
 
 
   const clearAllFilters = () => {
-
     setCountryFilter('');
-
     setRegionFilter('');
-
-    setStateFilter('');
-
     setCityQuery('');
 
     setSearchTerm('');
@@ -989,19 +939,19 @@ export const DashboardPage: React.FC = () => {
 
 
   const handleExportCsv = () => {
-
-    const header = 'Serviço,ID,Localização,Status,Consumo (kWh),Emissão (kgCO2e)\n';
-
+    const header =
+      'Serviço,ID,Localização,Status,Energia da última coleta (kWh),Emissão da última coleta (gCO2e),Coletado em\n';
+    const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`;
     const rows = filteredServices
-
-      .map(
-
-        (s) =>
-
-          `${s.code},${s.subId},"${s.location}",${s.status},"${s.consumptionLabel}","${s.emissionLabel}"`
-
-      )
-
+      .map(service => [
+        service.name,
+        service.id,
+        service.location,
+        service.status,
+        formatEnvironmentalMetric(service.consumptionKwh, 'kWh').formattedValue,
+        formatEnvironmentalMetric(service.emissionsGco2e, 'gCO₂e').formattedValue,
+        service.collectedAt ?? '',
+      ].map(escapeCsv).join(','))
       .join('\n');
 
     const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
@@ -1077,11 +1027,11 @@ export const DashboardPage: React.FC = () => {
 
               <span className="text-[#D4E3DA]">
 
-                {currentDateLabel} {lastUpdate}
+                {lastUpdate === '—' ? '—' : `${currentDateLabel} ${lastUpdate}`}
 
               </span>{' '}
 
-              · atualiza a cada 5 s
+              · atualiza a cada {formatIntervalLabel(pollingIntervalSeconds)}
 
             </span>
 
@@ -1179,58 +1129,68 @@ export const DashboardPage: React.FC = () => {
 
         lastUpdate={lastUpdate}
 
+        hasData={summary !== null}
+
         onRetry={triggerRefresh}
 
       />
 
 
 
-      {/* Seção: Consumo de KPIs em tempo real */}
+      {/* Indicadores consolidados */}
 
       <div className="mb-6">
 
         <h3 className="text-lg sm:text-xl font-bold text-[#F2FAF5] mb-3.5">
 
-          Consumo de KPIs em tempo real
+          Indicadores consolidados
 
         </h3>
 
 
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-
-          {[
-
-            { title: 'Consumo total', value: '128 kWh', sub: '▲ 4% vs. período anterior' },
-
-            { title: 'Emissão total', value: '54 kgCO₂e', sub: '▲ 3% vs. período anterior' },
-
-            { title: 'Serviços ativos', value: '94', sub: '73% do total' },
-
-            { title: 'Indisponíveis', value: '21', sub: '' },
-
-          ].map((kpi, i) => (
-
-            <div
-
-              key={i}
-
-              className="bg-[#0D2115] border-2 border-[#385E47] hover:border-[#2FA862] p-4 sm:p-5 rounded-2xl transition-colors"
-
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          {indicatorCards.map((card) => (
+            <article
+              key={card.title}
+              aria-label={card.title}
+              className="min-w-0 bg-[#0D2115] border-2 border-[#385E47] hover:border-[#2FA862] p-4 sm:p-5 rounded-2xl transition-colors"
             >
-
-              <h4 className="text-[#D4E3DA] text-xs sm:text-sm font-medium mb-2">{kpi.title}</h4>
-
-              <div className="text-2xl sm:text-3xl font-bold text-[#F2FAF5] mb-2">{kpi.value}</div>
-
-              <div className="text-[11px] sm:text-xs text-[#9DB0A4] min-h-[16px]">{kpi.sub}</div>
-
-            </div>
-
+              <h4 className="text-[#D4E3DA] text-xs sm:text-sm font-medium mb-2">
+                {card.title}
+              </h4>
+              <div className="text-2xl sm:text-3xl font-bold text-[#F2FAF5] mb-2 break-words">
+                {card.value}
+              </div>
+            </article>
           ))}
-
         </div>
 
+        {summary ? (
+          <div className="mt-3 space-y-1 text-[11px] sm:text-xs text-[#9DB0A4]">
+            <p>
+              Período das coletas: {formatCollectionPeriod(summary)} · janela de{' '}
+              {formatIntervalLabel(summary.janela_amostragem_segundos)}
+            </p>
+            <p role={summary.cobertura_parcial ? 'status' : undefined}>
+              {summary.cobertura_parcial
+                ? `Totais parciais: métricas disponíveis para ${summary.servidores_com_metricas} de ${summary.total_servidores} serviços; ${summary.servidores_sem_metricas} sem métricas.`
+                : summary.total_servidores === 0
+                  ? 'Nenhum serviço retornou dados nesta janela.'
+                  : `Cobertura completa: ${summary.servidores_com_metricas} de ${summary.total_servidores} serviços com métricas.`}
+            </p>
+          </div>
+        ) : (
+          <p className="mt-3 text-[11px] sm:text-xs text-[#9DB0A4]">
+            {isInitialLoad
+              ? 'Carregando período e cobertura dos indicadores…'
+              : 'Período e cobertura indisponíveis sem resposta da API.'}
+          </p>
+        )}
+
+        <p className="mt-2 text-[11px] sm:text-xs text-[#9DB0A4]">
+          Indicadores e lista de serviços vêm da API. As séries do gráfico de uso são apenas uma demonstração simulada.
+        </p>
       </div>
 
 
@@ -1317,45 +1277,9 @@ export const DashboardPage: React.FC = () => {
 
 
 
-        {/* Estado */}
-
-        <div className="lg:col-span-2">
-
-          <CustomFilterSelect
-
-            label="Estado"
-
-            value={stateFilter}
-
-            placeholder="Todos os estados"
-
-            options={stateOptions}
-
-            isOpen={openFilterMenu === 'state'}
-
-            onToggle={() =>
-
-              setOpenFilterMenu((prev) => (prev === 'state' ? null : 'state'))
-
-            }
-
-            onSelect={(val) => {
-
-              setStateFilter(val);
-
-              setOpenFilterMenu(null);
-
-            }}
-
-          />
-
-        </div>
-
-
-
         {/* Cidade */}
 
-        <div className="relative lg:col-span-3">
+        <div className="relative lg:col-span-5">
 
           <label className="block text-xs font-medium text-[#D4E3DA] mb-1.5">Cidade</label>
 
@@ -1545,11 +1469,13 @@ export const DashboardPage: React.FC = () => {
 
           <div>
 
-            <h3 className="font-bold text-lg sm:text-xl text-[#F2FAF5]">Uso em tempo real</h3>
+            <h3 className="font-bold text-lg sm:text-xl text-[#F2FAF5]">
+              Demonstração de uso em tempo real
+            </h3>
 
             <p className="text-[#9DB0A4] text-xs sm:text-sm mt-0.5">
 
-              Compare até 5 serviços · consumo em kWh
+              Séries simuladas de consumo · não representam os serviços listados
 
             </p>
 
@@ -1567,9 +1493,9 @@ export const DashboardPage: React.FC = () => {
 
             <span className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#0B1C12] border-2 border-[#385E47] text-xs text-[#D4E3DA] font-medium">
 
-              <span className="w-2.5 h-2.5 rounded-full bg-[#2FA862]" />
+              <span className="w-2.5 h-2.5 rounded-full bg-[#EAB308]" />
 
-              Ao vivo · atualiza a cada 5 s
+              Dados simulados
 
             </span>
 
@@ -1613,7 +1539,9 @@ export const DashboardPage: React.FC = () => {
 
                   onClick={() => toggleServiceSelection(svc.code)}
 
-                  title="Clique para remover da comparação"
+                  aria-label={`Remover ${svc.code} da demonstração`}
+
+                  title="Clique para remover da demonstração simulada"
 
                   className={`px-3 py-1 rounded-lg bg-[#0B1C12] border-2 ${colorSet.border} text-xs font-semibold text-[#F2FAF5] hover:bg-[#152E1F] transition-colors cursor-pointer`}
 
@@ -1914,65 +1842,21 @@ export const DashboardPage: React.FC = () => {
 
             <p className="text-[#9DB0A4] text-xs sm:text-sm mt-0.5">
 
-              128 serviços · marque até 5 para comparar
+              {services.length} serviços · métricas da última coleta
 
             </p>
 
           </div>
 
-
-
-          <span className="self-start px-3.5 py-1 rounded-full bg-[#0B1C12] border-2 border-[#385E47] text-xs text-[#9DB0A4] font-medium">
-
-            {selectedServiceCodes.length} de 5 selecionados
-
-          </span>
-
         </div>
 
 
 
-        {/* Barra de controles: Período, Ordenar por, Ordenar por métrica */}
+        {/* Barra de controles: Ordenação */}
 
         <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-4 mb-5">
 
           <div className="flex flex-wrap items-end gap-4">
-
-            {/* Período com o mesmo dropdown customizado e hover branco */}
-
-            <div ref={periodDropdownRef}>
-
-              <CustomFilterSelect
-
-                label="Período"
-
-                value={periodFilter}
-
-                placeholder="Últimos 30 dias"
-
-                options={periodOptions}
-
-                isOpen={openFilterMenu === 'period'}
-
-                onToggle={() =>
-
-                  setOpenFilterMenu((prev) => (prev === 'period' ? null : 'period'))
-
-                }
-
-                onSelect={(val) => {
-
-                  setPeriodFilter(val as '7d' | '30d' | '90d');
-
-                  setOpenFilterMenu(null);
-
-                }}
-
-                minWidthClass="min-w-[175px]"
-
-              />
-
-            </div>
 
 
 
@@ -2100,7 +1984,7 @@ export const DashboardPage: React.FC = () => {
 
           <span className="text-xs text-[#9DB0A4]">
 
-            Mostrando {filteredServices.length} de 128 serviços
+            {isInitialLoad ? 'Carregando serviços…' : `Mostrando ${filteredServices.length} de ${services.length} serviços`}
 
           </span>
 
@@ -2114,27 +1998,43 @@ export const DashboardPage: React.FC = () => {
 
           <div className="py-12 px-4 text-center border-2 border-dashed border-[#385E47] rounded-xl bg-[#09180F]">
 
-            <p className="text-sm font-medium text-[#F2FAF5] mb-1">Nenhum serviço encontrado</p>
-
-            <p className="text-xs text-[#9DB0A4] mb-4">
-
-              Não existem serviços correspondentes aos filtros aplicados.
-
+            <p className="text-sm font-medium text-[#F2FAF5] mb-1">
+              {isInitialLoad
+                ? 'Carregando serviços'
+                : hasError && summary === null
+                  ? 'Não foi possível carregar os serviços'
+                  : services.length === 0
+                    ? 'A API não retornou serviços'
+                    : 'Nenhum serviço encontrado'}
             </p>
 
-            <button
+            <p className="text-xs text-[#9DB0A4] mb-4">
+              {isInitialLoad
+                ? 'A lista será exibida assim que os dados da API forem recebidos.'
+                : hasError && summary === null
+                  ? 'Verifique a conexão e tente carregar novamente.'
+                  : services.length === 0
+                    ? 'Não há serviços cadastrados para exibir.'
+                    : 'Não existem serviços correspondentes aos filtros aplicados.'}
+            </p>
 
-              type="button"
-
-              onClick={clearAllFilters}
-
-              className="px-3.5 py-1.5 rounded-lg bg-[#1F8A4C] hover:bg-[#2FA862] text-white text-xs font-medium transition-colors cursor-pointer"
-
-            >
-
-              Limpar filtros
-
-            </button>
+            {hasError && summary === null ? (
+              <button
+                type="button"
+                onClick={() => void triggerRefresh()}
+                className="px-3.5 py-1.5 rounded-lg bg-[#1F8A4C] hover:bg-[#2FA862] text-white text-xs font-medium transition-colors cursor-pointer"
+              >
+                Tentar novamente
+              </button>
+            ) : services.length > 0 && filteredServices.length === 0 ? (
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                className="px-3.5 py-1.5 rounded-lg bg-[#1F8A4C] hover:bg-[#2FA862] text-white text-xs font-medium transition-colors cursor-pointer"
+              >
+                Limpar filtros
+              </button>
+            ) : null}
 
           </div>
 
@@ -2146,19 +2046,11 @@ export const DashboardPage: React.FC = () => {
 
             <div className="md:hidden space-y-3">
 
-              {filteredServices.map((row) => {
-
-                const isChecked = selectedServiceCodes.includes(row.code);
-
-                const disableNewSelection = !isChecked && selectedServiceCodes.length >= 5;
-
-
-
-                return (
+              {filteredServices.map((row) => (
 
                   <div
 
-                    key={row.code}
+                    key={row.id}
 
                     onClick={() => setSelectedServiceModal(mapServiceRowToModalData(row))}
 
@@ -2168,55 +2060,11 @@ export const DashboardPage: React.FC = () => {
 
                     <div className="flex items-start justify-between gap-2 mb-2.5">
 
-                      <div className="flex items-center gap-2.5">
+                      <div>
 
-                        <button
+                        <div className="font-semibold text-sm text-[#F2FAF5]">{row.name}</div>
 
-                          type="button"
-
-                          disabled={disableNewSelection}
-
-                          onClick={(e) => {
-
-                            e.stopPropagation();
-
-                            toggleServiceSelection(row.code);
-
-                          }}
-
-                          aria-label={`Selecionar ${row.code} para comparação`}
-
-                          className={`w-5 h-5 rounded-md flex items-center justify-center border-2 transition-colors cursor-pointer ${
-
-                            isChecked
-
-                              ? 'bg-[#2FA862] border-[#14C45A] text-white'
-
-                              : 'bg-transparent border-[#8FA89B] disabled:opacity-40'
-
-                          }`}
-
-                        >
-
-                          {isChecked && (
-
-                            <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.8">
-
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 10.5l3.2 3.2L15 7" />
-
-                            </svg>
-
-                          )}
-
-                        </button>
-
-                        <div>
-
-                          <div className="font-semibold text-sm text-[#F2FAF5]">{row.code}</div>
-
-                          <div className="text-[11px] text-[#9DB0A4]">{row.subId}</div>
-
-                        </div>
+                        <div className="text-[11px] text-[#9DB0A4]">ID: {row.id}</div>
 
                       </div>
 
@@ -2240,25 +2088,34 @@ export const DashboardPage: React.FC = () => {
 
                         <span className="text-[#9DB0A4]">Consumo (kWh)</span>
 
-                        <span className="text-[#D4E3DA]">{row.consumptionLabel}</span>
+                        <span className="text-[#D4E3DA]">
+                          {formatEnvironmentalMetric(row.consumptionKwh, 'kWh').formattedValue}
+                        </span>
 
                       </div>
 
                       <div className="flex items-center justify-between pt-1">
 
-                        <span className="text-[#9DB0A4]">Emissão (kgCO₂e)</span>
+                        <span className="text-[#9DB0A4]">Emissão (gCO₂e)</span>
 
-                        <span className="text-[#D4E3DA] font-medium">{row.emissionLabel}</span>
+                        <span className="text-[#D4E3DA] font-medium">
+                          {formatEnvironmentalMetric(row.emissionsGco2e, 'gCO₂e').formattedValue}
+                        </span>
 
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1">
+                        <span className="text-[#9DB0A4]">Última coleta</span>
+                        <span className="text-[#D4E3DA] font-medium">
+                          {formatCollectedAt(row.collectedAt)}
+                        </span>
                       </div>
 
                     </div>
 
                   </div>
 
-                );
-
-              })}
+              ))}
 
             </div>
 
@@ -2272,16 +2129,16 @@ export const DashboardPage: React.FC = () => {
 
                 <thead>
                   <tr className="bg-[#96AA9E] text-[#07150E] text-xs font-semibold">
-                    <th className="py-3 pl-4 pr-2 rounded-l-lg w-10"></th>
-                    <th className="py-3 px-3 border-r border-[#07150E]/20">Serviço</th>
+                    <th className="py-3 px-3 rounded-l-lg border-r border-[#07150E]/20">Serviço / ID</th>
                     <th className="py-3 px-4 border-r border-[#07150E]/20">Localização</th>
                     <th className="py-3 px-4 border-r border-[#07150E]/20">Status</th>
                     <th className="py-3 px-4 border-r border-[#07150E]/20">
-                      Consumo no período (kWh)
+                      Energia na última coleta (kWh)
                     </th>
-                    <th className="py-3 px-4 rounded-r-lg">
-                      Emissão no período (kgCO₂e)
+                    <th className="py-3 px-4 border-r border-[#07150E]/20">
+                      Emissão na última coleta (gCO₂e)
                     </th>
+                    <th className="py-3 px-4 rounded-r-lg">Coletado em</th>
                   </tr>
                 </thead>
 
@@ -2291,19 +2148,11 @@ export const DashboardPage: React.FC = () => {
 
 
 
-                  {filteredServices.map((row) => {
-
-                    const isChecked = selectedServiceCodes.includes(row.code);
-
-                    const disableNewSelection = !isChecked && selectedServiceCodes.length >= 5;
-
-
-
-                    return (
+                  {filteredServices.map((row) => (
 
                       <tr
 
-                        key={row.code}
+                        key={row.id}
 
                         onClick={() => setSelectedServiceModal(mapServiceRowToModalData(row))}
 
@@ -2311,55 +2160,9 @@ export const DashboardPage: React.FC = () => {
 
                       >
 
-                        <td
-
-                          className="py-3.5 pl-4 pr-2"
-
-                          onClick={(e) => e.stopPropagation()}
-
-                        >
-
-                          <button
-
-                            type="button"
-
-                            disabled={disableNewSelection}
-
-                            onClick={() => toggleServiceSelection(row.code)}
-
-                            aria-label={`Selecionar ${row.code} para comparação`}
-
-                            className={`w-5 h-5 rounded-md flex items-center justify-center border-2 transition-colors cursor-pointer ${
-
-                              isChecked
-
-                                ? 'bg-[#2FA862] border-[#14C45A] text-white'
-
-                                : 'bg-transparent border-[#8FA89B] hover:border-[#F2FAF5] disabled:opacity-35 disabled:cursor-not-allowed'
-
-                            }`}
-
-                          >
-
-                            {isChecked && (
-
-                              <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.8">
-
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 10.5l3.2 3.2L15 7" />
-
-                              </svg>
-
-                            )}
-
-                          </button>
-
-                        </td>
-
                         <td className="py-3.5 px-3">
-
-                          <div className="font-semibold text-[#F2FAF5]">{row.code}</div>
-
-                          <div className="text-xs text-[#9DB0A4]">{row.subId}</div>
+                          <div className="font-semibold text-[#F2FAF5]">{row.name}</div>
+                          <div className="text-xs text-[#9DB0A4]">ID: {row.id}</div>
 
                         </td>
 
@@ -2371,15 +2174,21 @@ export const DashboardPage: React.FC = () => {
 
                         </td>
 
-                        <td className="py-3.5 px-4 text-[#D4E3DA]">{row.consumptionLabel}</td>
+                        <td className="py-3.5 px-4 text-[#D4E3DA]">
+                          {formatEnvironmentalMetric(row.consumptionKwh, 'kWh').formattedValue}
+                        </td>
 
-                        <td className="py-3.5 px-4 text-[#D4E3DA]">{row.emissionLabel}</td>
+                        <td className="py-3.5 px-4 text-[#D4E3DA]">
+                          {formatEnvironmentalMetric(row.emissionsGco2e, 'gCO₂e').formattedValue}
+                        </td>
+
+                        <td className="py-3.5 px-4 text-[#D4E3DA]">
+                          {formatCollectedAt(row.collectedAt)}
+                        </td>
 
                       </tr>
 
-                    );
-
-                  })}
+                  ))}
 
                 </tbody>
 
@@ -2393,136 +2202,8 @@ export const DashboardPage: React.FC = () => {
 
 
 
-        {/* Rodapé da tabela com paginação e SVGs oficiais do Figma */}
-
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mt-6 text-xs text-[#9DB0A4]">
-
-          <span>Mostrando 1–{filteredServices.length} de 128 serviços</span>
-
-          <div className="flex gap-1.5">
-
-            <button
-
-              type="button"
-
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-
-              aria-label="Página anterior"
-
-              className="w-9 h-9 flex items-center justify-center bg-[#0B1C12] border-2 border-[#385E47] rounded-xl hover:bg-[#183825] transition cursor-pointer"
-
-            >
-
-              <svg className="w-[8px] h-[13px]" viewBox="0 0 10 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-
-                <path
-
-                  d="M7.8125 1.5625L1.5625 7.8125L7.8125 14.0625"
-
-                  strokeWidth="3.125"
-
-                  strokeLinecap="round"
-
-                  strokeLinejoin="round"
-
-                  stroke="#8FA89B"
-
-                />
-
-              </svg>
-
-            </button>
-
-            {[1, 2, 3].map((page) => (
-
-              <button
-
-                key={page}
-
-                type="button"
-
-                onClick={() => setCurrentPage(page)}
-
-                className={`w-9 h-9 flex items-center justify-center rounded-xl border-2 text-xs transition cursor-pointer ${
-
-                  currentPage === page
-
-                    ? 'bg-[#2FA862] text-[#F2FAF5] border-[#14C45A] font-bold'
-
-                    : 'bg-[#0B1C12] border-[#385E47] text-[#8FA89B] font-medium hover:bg-[#183825]'
-
-                }`}
-
-              >
-
-                {page}
-
-              </button>
-
-            ))}
-
-            <span className="w-9 h-9 flex items-center justify-center bg-[#0B1C12] border-2 border-[#385E47] rounded-xl text-[#8FA89B] font-medium">
-
-              ...
-
-            </span>
-
-            <button
-
-              type="button"
-
-              onClick={() => setCurrentPage(16)}
-
-              className={`w-9 h-9 flex items-center justify-center rounded-xl border-2 text-xs transition cursor-pointer ${
-
-                currentPage === 16
-
-                  ? 'bg-[#2FA862] text-[#F2FAF5] border-[#14C45A] font-bold'
-
-                  : 'bg-[#0B1C12] border-[#385E47] text-[#8FA89B] font-medium hover:bg-[#183825]'
-
-              }`}
-
-            >
-
-              16
-
-            </button>
-
-            <button
-
-              type="button"
-
-              onClick={() => setCurrentPage((p) => Math.min(16, p + 1))}
-
-              aria-label="Próxima página"
-
-              className="w-9 h-9 flex items-center justify-center bg-[#0B1C12] border-2 border-[#385E47] rounded-xl hover:bg-[#183825] transition cursor-pointer"
-
-            >
-
-              <svg className="w-[24px] h-[24px]" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
-
-                <path
-
-                  d="M12.5 21.25L18.75 15L12.5 8.75"
-
-                  strokeWidth="3.125"
-
-                  strokeLinecap="round"
-
-                  strokeLinejoin="round"
-
-                  stroke="#8FA89B"
-
-                />
-
-              </svg>
-
-            </button>
-
-          </div>
-
+        <div className="mt-6 text-xs text-[#9DB0A4]">
+          Mostrando {filteredServices.length} de {services.length} serviços
         </div>
 
       </div>
