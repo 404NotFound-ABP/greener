@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { StatusBadge } from '../components/StatusBadge';
 import { ToggleSwitch } from '../components/ToggleSwitch';
+import { formatIntervalLabel } from '../hooks/useServicesPolling';
 
 interface AccountSettingsPageProps {
   onBack?: () => void;
@@ -16,15 +17,37 @@ interface MonitoredService {
 
 type AccountModalType = 'email' | 'password' | '2fa' | 'backup' | null;
 
+// Valores alinhados com INTERVALOS_PERMITIDOS_SEGUNDOS do back-end (CollectorService)
 const INTERVAL_OPTIONS = [
-  { label: '5 segundos', value: 5 },
-  { label: '10 segundos', value: 10 },
-  { label: '30 segundos', value: 30 },
-  { label: '1 minuto', value: 60 },
   { label: '5 minutos', value: 300 },
+  { label: '15 minutos', value: 900 },
   { label: '30 minutos', value: 1800 },
   { label: '1 hora', value: 3600 },
+  { label: '1 dia', value: 86400 },
+  { label: '1 mês (30 dias)', value: 2592000 },
 ];
+
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
+
+function formatDateTimeBR(isoDate?: string | null): string {
+  if (!isoDate) return 'Nenhuma atualização registrada';
+  const parsed = new Date(isoDate);
+  if (Number.isNaN(parsed.getTime())) return 'Nenhuma atualização registrada';
+
+  const datePart = new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(parsed);
+
+  const timePart = new Intl.DateTimeFormat('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).format(parsed);
+
+  return `${datePart} às ${timePart}`;
+}
 
 export const AccountSettingsPage: React.FC<AccountSettingsPageProps> = ({ onBack }) => {
   const [services, setServices] = useState<MonitoredService[]>([
@@ -34,9 +57,12 @@ export const AccountSettingsPage: React.FC<AccountSettingsPageProps> = ({ onBack
     { id: '4', name: 'ASTAH-STU', location: 'Cidade do México - MX', status: 'no-metrics', enabled: false },
   ]);
 
-  const [savedConfig, setSavedConfig] = useState({ collectionInterval: 30, refreshInterval: 5 });
-  const [collectionInterval, setCollectionInterval] = useState<number>(30);
-  const [refreshInterval, setRefreshInterval] = useState<number>(5);
+  const [savedConfig, setSavedConfig] = useState({ collectionInterval: 300, refreshInterval: 300 });
+  const [collectionInterval, setCollectionInterval] = useState<number>(300);
+  const [refreshInterval, setRefreshInterval] = useState<number>(300);
+  const [lastSuccessfulCollection, setLastSuccessfulCollection] = useState<string | null>(null);
+  const [lastConfigUpdatedAt, setLastConfigUpdatedAt] = useState<string | null>(null);
+  const [isLoadingConfig, setIsLoadingConfig] = useState<boolean>(true);
 
   const [isSaving, setIsSaving] = useState(false);
   const [isDiscovering, setIsDiscovering] = useState(false);
@@ -66,6 +92,81 @@ export const AccountSettingsPage: React.FC<AccountSettingsPageProps> = ({ onBack
 
   // Backup
   const [lastBackupDate, setLastBackupDate] = useState('17/10/2026 às 14:32');
+
+  const fetchIntervalsAndStatus = useCallback(async () => {
+    setIsLoadingConfig(true);
+    const token =
+      localStorage.getItem('token') ||
+      localStorage.getItem('access_token') ||
+      sessionStorage.getItem('token');
+
+    try {
+      const [statusRes, configRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/coleta/status`).catch(() => null),
+        token
+          ? fetch(`${API_BASE_URL}/api/coleta/configuracao`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }).catch(() => null)
+          : Promise.resolve(null),
+      ]);
+
+      if (statusRes?.ok) {
+        const statusData = (await statusRes.json()) as {
+          intervaloConfiguradoSegundos?: number;
+          intervaloAtualizacaoSegundos?: number;
+          ultimaExecucao?: string | null;
+        };
+
+        if (statusData.ultimaExecucao) {
+          setLastSuccessfulCollection(statusData.ultimaExecucao);
+        }
+
+        if (
+          typeof statusData.intervaloConfiguradoSegundos === 'number' &&
+          typeof statusData.intervaloAtualizacaoSegundos === 'number'
+        ) {
+          const next = {
+            collectionInterval: statusData.intervaloConfiguradoSegundos,
+            refreshInterval: statusData.intervaloAtualizacaoSegundos,
+          };
+          setSavedConfig(next);
+          setCollectionInterval(next.collectionInterval);
+          setRefreshInterval(next.refreshInterval);
+        }
+      }
+
+      if (configRes?.ok) {
+        const configData = (await configRes.json()) as {
+          intervalo_coleta_segundos?: number;
+          intervalo_atualizacao_segundos?: number;
+          atualizado_em?: string | null;
+        };
+
+        if (
+          typeof configData.intervalo_coleta_segundos === 'number' &&
+          typeof configData.intervalo_atualizacao_segundos === 'number'
+        ) {
+          const next = {
+            collectionInterval: configData.intervalo_coleta_segundos,
+            refreshInterval: configData.intervalo_atualizacao_segundos,
+          };
+          setSavedConfig(next);
+          setCollectionInterval(next.collectionInterval);
+          setRefreshInterval(next.refreshInterval);
+        }
+
+        if (configData.atualizado_em) {
+          setLastConfigUpdatedAt(configData.atualizado_em);
+        }
+      }
+    } finally {
+      setIsLoadingConfig(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchIntervalsAndStatus();
+  }, [fetchIntervalsAndStatus]);
 
   const showToast = (msg: string) => {
     setAccountToast(msg);
@@ -174,6 +275,7 @@ export const AccountSettingsPage: React.FC<AccountSettingsPageProps> = ({ onBack
       monitoramento: {
         intervaloColetaSegundos: savedConfig.collectionInterval,
         intervaloAtualizacaoSegundos: savedConfig.refreshInterval,
+        ultimaColetaBemSucedida: lastSuccessfulCollection,
         servicos: services,
       },
     };
@@ -201,34 +303,92 @@ export const AccountSettingsPage: React.FC<AccountSettingsPageProps> = ({ onBack
     );
   };
 
-  const handleDiscoverServices = () => {
+  const handleDiscoverServices = async () => {
     setIsDiscovering(true);
-    setTimeout(() => setIsDiscovering(false), 600);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/coleta/executar`, { method: 'POST' });
+      if (response.ok) {
+        await fetchIntervalsAndStatus();
+        showToast('Ciclo de coleta executado e status atualizado.');
+      }
+    } finally {
+      setIsDiscovering(false);
+    }
   };
 
-  const handleSaveIntervals = (e: React.FormEvent) => {
+  const handleSaveIntervals = async (e: React.FormEvent) => {
     e.preventDefault();
     setFeedback(null);
 
-    if (collectionInterval < 5 || refreshInterval < 5) {
+    const allowedValues = INTERVAL_OPTIONS.map((opt) => opt.value);
+    if (!allowedValues.includes(collectionInterval) || !allowedValues.includes(refreshInterval)) {
       setCollectionInterval(savedConfig.collectionInterval);
       setRefreshInterval(savedConfig.refreshInterval);
       setFeedback({
         type: 'error',
-        message: 'Intervalo inválido (mínimo de 5 segundos). A configuração anterior foi mantida.',
+        message: 'Intervalo inválido fora das opções permitidas. A configuração anterior foi mantida.',
       });
       return;
     }
 
     setIsSaving(true);
-    setTimeout(() => {
+    const token =
+      localStorage.getItem('token') ||
+      localStorage.getItem('access_token') ||
+      sessionStorage.getItem('token');
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/coleta/configuracao`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          intervalo_coleta_segundos: collectionInterval,
+          intervalo_atualizacao_segundos: refreshInterval,
+        }),
+      });
+
+      if (response.ok) {
+        const updated = (await response.json()) as {
+          intervalo_coleta_segundos: number;
+          intervalo_atualizacao_segundos: number;
+          atualizado_em?: string | null;
+        };
+
+        setSavedConfig({
+          collectionInterval: updated.intervalo_coleta_segundos,
+          refreshInterval: updated.intervalo_atualizacao_segundos,
+        });
+        if (updated.atualizado_em) {
+          setLastConfigUpdatedAt(updated.atualizado_em);
+        }
+        setFeedback({
+          type: 'success',
+          message: 'Intervalos de coleta e atualização salvos e aplicados ao coletor com sucesso.',
+        });
+      } else if (response.status === 401 || response.status === 403) {
+        setCollectionInterval(savedConfig.collectionInterval);
+        setRefreshInterval(savedConfig.refreshInterval);
+        setFeedback({
+          type: 'error',
+          message: 'Permissão de administrador necessária para alterar os intervalos no servidor.',
+        });
+      } else {
+        throw new Error(`HTTP ${response.status}`);
+      }
+    } catch {
+      // Fallback local caso o back-end ainda não esteja em execução
       setSavedConfig({ collectionInterval, refreshInterval });
-      setIsSaving(false);
+      setLastConfigUpdatedAt(new Date().toISOString());
       setFeedback({
         type: 'success',
-        message: 'Intervalos de coleta e atualização salvos com sucesso.',
+        message: 'Intervalos aplicados localmente (aguardando conexão com o servidor para persistência).',
       });
-    }, 500);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const accountCards: {
@@ -348,13 +508,25 @@ export const AccountSettingsPage: React.FC<AccountSettingsPageProps> = ({ onBack
           ))}
         </section>
 
-        {/* Bloco 2: Serviços monitorados e Intervalos (T30/US16) */}
+        {/* Bloco 2: Serviços monitorados e Intervalos (T29.2 / T30) */}
         <section className="bg-[#0E2218] border border-[#1B4D3E] rounded-[10px] p-4 sm:p-6 space-y-4">
-          <div>
-            <h2 className="text-base font-semibold text-[#F7F7F5]">Serviços monitorados</h2>
-            <p className="text-xs text-[#8FA89B]">
-              Serviços descobertos no agregador. Escolha o que você quer monitorar
-            </p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h2 className="text-base font-semibold text-[#F7F7F5]">Serviços monitorados</h2>
+              <p className="text-xs text-[#8FA89B]">
+                Serviços descobertos no agregador. Escolha o que você quer monitorar
+              </p>
+            </div>
+
+            {/* Resumo dos intervalos ativos e última atualização bem-sucedida (T29.2/US09) */}
+            <div className="flex flex-wrap items-center gap-2 text-[11px]">
+              <span className="px-2.5 py-1 rounded-[6px] bg-[#0B1C12] border border-[#1B4D3E] text-[#D4E3DA]">
+                Coleta: <strong className="text-[#4ADE80]">{formatIntervalLabel(savedConfig.collectionInterval)}</strong>
+              </span>
+              <span className="px-2.5 py-1 rounded-[6px] bg-[#0B1C12] border border-[#1B4D3E] text-[#D4E3DA]">
+                Interface: <strong className="text-[#4ADE80]">{formatIntervalLabel(savedConfig.refreshInterval)}</strong>
+              </span>
+            </div>
           </div>
 
           {/* Lista de serviços */}
@@ -382,15 +554,25 @@ export const AccountSettingsPage: React.FC<AccountSettingsPageProps> = ({ onBack
             ))}
           </div>
 
-          {/* Descobrir serviços agora */}
+          {/* Descobrir serviços agora + Última atualização bem-sucedida */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-[#1B4D3E]">
-            <div>
+            <div className="space-y-0.5">
               <p className="text-sm font-medium text-[#F7F7F5]">Descobrir serviços agora</p>
-              <p className="text-xs text-[#8FA89B]">Última descoberta: 17/10/2026 14:32</p>
+              <p className="text-xs text-[#8FA89B]">
+                Última atualização bem-sucedida:{' '}
+                <span className="text-[#D4E3DA] font-medium">
+                  {isLoadingConfig ? 'Carregando...' : formatDateTimeBR(lastSuccessfulCollection)}
+                </span>
+              </p>
+              {lastConfigUpdatedAt && (
+                <p className="text-[11px] text-[#8FA89B]">
+                  Intervalos alterados em: {formatDateTimeBR(lastConfigUpdatedAt)}
+                </p>
+              )}
             </div>
             <button
               type="button"
-              onClick={handleDiscoverServices}
+              onClick={() => void handleDiscoverServices()}
               disabled={isDiscovering}
               className="w-full sm:w-auto px-4 py-2 rounded-[8px] bg-[#2FA862] hover:bg-[#1F8A4C] border border-[#14C45A] disabled:opacity-50 text-xs font-semibold text-[#F7F7F5] transition-colors cursor-pointer"
             >
@@ -398,14 +580,16 @@ export const AccountSettingsPage: React.FC<AccountSettingsPageProps> = ({ onBack
             </button>
           </div>
 
-          {/* Formulário dos intervalos de monitoramento (T30.1 & T30.2) */}
-          <form onSubmit={handleSaveIntervals} className="space-y-4 pt-3 border-t border-[#1B4D3E]">
+          {/* Formulário dos intervalos de monitoramento (T29.2 / T30.1 & T30.2) */}
+          <form onSubmit={(e) => void handleSaveIntervals(e)} className="space-y-4 pt-3 border-t border-[#1B4D3E]">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <label htmlFor="collection-interval" className="text-sm font-medium text-[#F7F7F5] block">
                   Intervalo de coleta dos agentes
                 </label>
-                <p className="text-xs text-[#8FA89B]">Frequência de leitura de consumo nos servidores</p>
+                <p className="text-xs text-[#8FA89B]">
+                  Frequência de leitura de consumo nos servidores (ativo: {formatIntervalLabel(savedConfig.collectionInterval)})
+                </p>
               </div>
               <select
                 id="collection-interval"
@@ -426,7 +610,9 @@ export const AccountSettingsPage: React.FC<AccountSettingsPageProps> = ({ onBack
                 <label htmlFor="refresh-interval" className="text-sm font-medium text-[#F7F7F5] block">
                   Mudar tempo de atualização
                 </label>
-                <p className="text-xs text-[#8FA89B]">Tempo de atualização automática da interface</p>
+                <p className="text-xs text-[#8FA89B]">
+                  Tempo de atualização automática da interface (ativo: {formatIntervalLabel(savedConfig.refreshInterval)})
+                </p>
               </div>
               <select
                 id="refresh-interval"

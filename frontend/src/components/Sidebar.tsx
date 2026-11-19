@@ -10,7 +10,7 @@ import {
   defaultServiceRepository,
   type ServiceRepository
 } from '../adapters/serviceAdapter';
-import { useServicesPolling } from '../hooks/useServicesPolling';
+import { formatIntervalLabel, useServicesPolling } from '../hooks/useServicesPolling';
 import { extractValidCoordinates, formatServiceLocation } from './mapServiceUtils';
 
 export type MobileSheetView = 'filters' | 'list' | 'collapsed';
@@ -73,6 +73,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const {
     services,
     lastUpdate,
+    pollingIntervalSeconds,
     isPaused,
     isRefreshing,
     hasError,
@@ -128,7 +129,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       : 'Atualização pausada'
     : isStale
     ? 'Dados antigos · reconectando...'
-    : 'Atualizando a cada 5s';
+    : `Atualizando a cada ${formatIntervalLabel(pollingIntervalSeconds)}`;
 
   const renderServiceItem = (service: ServiceData) => {
     const hasCoords = Boolean(extractValidCoordinates(service));

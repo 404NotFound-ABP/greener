@@ -5,8 +5,8 @@ import {
   type ServiceRepository
 } from '../adapters/serviceAdapter';
 
-const POLLING_INTERVAL_MS = 5000;
-const STALE_THRESHOLD_MS = 15000;
+const DEFAULT_POLLING_INTERVAL_MS = 300_000; // 5 minutos (padrão do back-end)
+const MIN_STALE_THRESHOLD_MS = 15_000;
 
 const formatTimeHHMMSS = (timestamp: number = Date.now()): string => {
   const date = new Date(timestamp);
@@ -16,14 +16,29 @@ const formatTimeHHMMSS = (timestamp: number = Date.now()): string => {
   return `${hours}:${minutes}:${seconds}`;
 };
 
+export function formatIntervalLabel(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)} min`;
+  if (seconds < 86400) {
+    const hours = Math.round(seconds / 3600);
+    return hours === 1 ? '1 hora' : `${hours} horas`;
+  }
+  const days = Math.round(seconds / 86400);
+  if (days === 30) return '1 mês (30d)';
+  return days === 1 ? '1 dia' : `${days} dias`;
+}
+
 export interface UseServicesPollingOptions {
   repository?: ServiceRepository;
   initialServices?: ServiceData[];
+  pollingIntervalMs?: number;
 }
 
 export interface UseServicesPollingResult {
   services: ServiceData[];
   lastUpdate: string;
+  lastSuccessTimestamp: number;
+  pollingIntervalSeconds: number;
   isPaused: boolean;
   isRefreshing: boolean;
   hasError: boolean;
@@ -57,14 +72,18 @@ const FALLBACK_INITIAL_SERVICES: ServiceData[] = [
 ];
 
 /**
- * Hook responsável exclusivamente pelo ciclo de atualização periódica,
- * detecção de dados antigos e recuperação após falha (SRP + DIP).
+ * Hook responsável pelo ciclo de atualização periódica,
+ * detecção de dados antigos e recuperação após falha (T29.2 / T29.3).
  */
 export function useServicesPolling({
   repository = defaultServiceRepository,
-  initialServices = FALLBACK_INITIAL_SERVICES
+  initialServices = FALLBACK_INITIAL_SERVICES,
+  pollingIntervalMs
 }: UseServicesPollingOptions = {}): UseServicesPollingResult {
   const [services, setServices] = useState<ServiceData[]>(initialServices);
+  const [resolvedIntervalMs, setResolvedIntervalMs] = useState<number>(
+    pollingIntervalMs ?? DEFAULT_POLLING_INTERVAL_MS
+  );
   const [isPaused, setIsPaused] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -72,6 +91,41 @@ export function useServicesPolling({
   const [lastUpdate, setLastUpdate] = useState<string>(() => formatTimeHHMMSS());
   const [hasError, setHasError] = useState(false);
   const [isStale, setIsStale] = useState(false);
+
+  // Sincroniza com o intervalo configurado no back-end (/api/coleta/status) caso não tenha sido passado via prop
+  useEffect(() => {
+    if (typeof pollingIntervalMs === 'number' && pollingIntervalMs >= 5000) {
+      setResolvedIntervalMs(pollingIntervalMs);
+      return;
+    }
+
+    let isMounted = true;
+    const apiBaseUrl = import.meta.env.VITE_API_URL ?? '';
+
+    const loadConfiguredInterval = async () => {
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/coleta/status`);
+        if (!response.ok) return;
+        const data = (await response.json()) as {
+          intervaloAtualizacaoSegundos?: number;
+        };
+        if (
+          isMounted &&
+          typeof data.intervaloAtualizacaoSegundos === 'number' &&
+          data.intervaloAtualizacaoSegundos >= 5
+        ) {
+          setResolvedIntervalMs(data.intervaloAtualizacaoSegundos * 1000);
+        }
+      } catch {
+        // Mantém o intervalo padrão quando o back-end estiver offline
+      }
+    };
+
+    void loadConfiguredInterval();
+    return () => {
+      isMounted = false;
+    };
+  }, [pollingIntervalMs]);
 
   const triggerRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -101,20 +155,22 @@ export function useServicesPolling({
 
     const intervalId = window.setInterval(() => {
       void triggerRefresh();
-    }, POLLING_INTERVAL_MS);
+    }, resolvedIntervalMs);
 
     return () => window.clearInterval(intervalId);
-  }, [isPaused, triggerRefresh, lastSuccessTime]);
+  }, [isPaused, triggerRefresh, lastSuccessTime, resolvedIntervalMs]);
 
   useEffect(() => {
+    const staleThresholdMs = Math.max(MIN_STALE_THRESHOLD_MS, resolvedIntervalMs * 2);
+
     const staleChecker = window.setInterval(() => {
-      if (Date.now() - lastSuccessTime > STALE_THRESHOLD_MS) {
+      if (Date.now() - lastSuccessTime > staleThresholdMs) {
         setIsStale(true);
       }
     }, 2000);
 
     return () => window.clearInterval(staleChecker);
-  }, [lastSuccessTime]);
+  }, [lastSuccessTime, resolvedIntervalMs]);
 
   const togglePause = useCallback(() => {
     setIsPaused((prev) => !prev);
@@ -123,6 +179,8 @@ export function useServicesPolling({
   return {
     services,
     lastUpdate,
+    lastSuccessTimestamp: lastSuccessTime,
+    pollingIntervalSeconds: Math.round(resolvedIntervalMs / 1000),
     isPaused,
     isRefreshing,
     hasError,
