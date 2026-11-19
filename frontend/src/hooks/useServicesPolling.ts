@@ -53,6 +53,7 @@ const FALLBACK_INITIAL_SERVICES: ServiceData[] = [
     nome: 'Serviço',
     status: 'Ativo',
     localizacao: { pais: 'Brasil', regiao: 'Sudeste', cidade: 'Caçapava' },
+    coords: [-23.1009, -45.7069],
     valores: { kwh: 100, gco2e: 45 }
   },
   {
@@ -60,6 +61,7 @@ const FALLBACK_INITIAL_SERVICES: ServiceData[] = [
     nome: 'Serviço',
     status: 'Indisponível',
     localizacao: { pais: 'Brasil', regiao: 'Sudeste', cidade: 'Caçapava' },
+    coords: [-23.0999, -45.7069],
     valores: { kwh: 100, gco2e: 0 }
   },
   {
@@ -67,6 +69,7 @@ const FALLBACK_INITIAL_SERVICES: ServiceData[] = [
     nome: 'ASTAH-STU',
     status: 'Sem métrica',
     localizacao: { pais: 'Brasil', regiao: 'Sudeste', cidade: 'Taubaté' },
+    coords: [-23.0264, -45.5553],
     valores: { kwh: 100, gco2e: 32 }
   }
 ];
@@ -149,6 +152,11 @@ export function useServicesPolling({
       }, 300);
     }
   }, [repository]);
+
+  // Executa a coleta inicial assim que o hook é montado
+  useEffect(() => {
+    void triggerRefresh();
+  }, [triggerRefresh]);
 
   useEffect(() => {
     if (isPaused) return;
