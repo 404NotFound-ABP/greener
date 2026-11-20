@@ -116,7 +116,7 @@ export class ServiceAdapter {
     const hasLatestMetrics = raw.ultima_coleta?.potencia_watts != null;
     const status =
       raw.status?.toLowerCase().trim() === 'disponivel' && !hasLatestMetrics
-        ? 'Sem métrica'
+        ? 'Sem métricas'
         : normalizeServiceStatus(raw.status);
 
     return {
@@ -199,7 +199,7 @@ const INITIAL_MOCK_SERVICES: ServiceData[] = [
   {
     id: '3',
     nome: 'ASTAH-STU',
-    status: 'Sem métrica',
+    status: 'Sem métricas',
     localizacao: { pais: 'Brasil', regiao: 'Sudeste', cidade: 'Taubaté' },
     coords: [-23.0264, -45.5553],
     valores: { kwh: 100, gco2e: 32 }

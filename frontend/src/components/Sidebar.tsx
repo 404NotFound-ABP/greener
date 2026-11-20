@@ -641,7 +641,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </svg>
               </div>
               <span className="text-[#F7F7F5] text-[16px] font-normal leading-[24px] whitespace-nowrap">
-                Sem métrica
+                Sem métricas
               </span>
             </button>
           </div>

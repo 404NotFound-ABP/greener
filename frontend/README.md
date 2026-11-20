@@ -39,7 +39,7 @@ A página consulta `GET /api/coleta/historico` e usa `servidorId` para filtrar p
 
 ## Dashboard
 
-Os indicadores e a lista principal usam a resposta de `GET /api/servidores/dashboard`. A tabela mostra o identificador, nome, status, localização e métricas da última coleta: energia em kWh e emissões em gCO₂e. Valores ausentes permanecem como indisponíveis; a data da leitura é exibida para não confundir a última coleta com um total do período. Os filtros de país, região e cidade são preenchidos com os serviços retornados pela API. O contrato não fornece estado/província separado, então essa dimensão não é simulada. A série do gráfico “Demonstração de uso em tempo real” continua explicitamente identificada como simulada.
+Os indicadores e a lista principal usam a resposta de `GET /api/servidores/dashboard`. A tabela mostra o identificador, nome, status, localização e métricas da última coleta: energia em kWh e emissões em gCO₂e. Os status da API são normalizados para **Ativo**, **Indisponível** ou **Sem métricas**, e o filtro de status é composto pelas categorias presentes na resposta atual. Valores ausentes permanecem como indisponíveis; a data da leitura é exibida para não confundir a última coleta com um total do período. Os filtros de país, região e cidade também são preenchidos com os serviços retornados pela API. O contrato não fornece estado/província separado, então essa dimensão não é simulada. A série do gráfico “Demonstração de uso em tempo real” continua explicitamente identificada como simulada.
 
 ## Comparação de serviços
 

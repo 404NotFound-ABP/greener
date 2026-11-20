@@ -62,7 +62,7 @@ describe('ServiceAdapter', () => {
     });
     expect(indisponivel?.status).toBe('Indisponível');
     expect(semMetricas).toMatchObject({
-      status: 'Sem métrica',
+      status: 'Sem métricas',
       valores: { kwh: null, gco2e: null }
     });
   });

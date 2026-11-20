@@ -31,7 +31,7 @@ export const STATUS_CONFIG: Record<ServiceFilterKey, StatusMetadata> = {
   },
   sem_metricas: {
     filterKey: 'sem_metricas',
-    label: 'Sem métrica'
+    label: 'Sem métricas'
   }
 };
 
@@ -41,7 +41,7 @@ export function resolveServiceFilterKey(rawStatus: string): ServiceFilterKey {
 }
 
 export function normalizeServiceStatus(rawStatus?: string): ServiceStatus {
-  if (!rawStatus) return 'Sem métrica';
+  if (!rawStatus) return 'Sem métricas';
   const key = resolveServiceFilterKey(rawStatus);
   return STATUS_CONFIG[key].label;
 }

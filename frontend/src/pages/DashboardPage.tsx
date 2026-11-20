@@ -17,6 +17,11 @@ import { PollingStatusBanner } from '../components/PollingStatusBanner';
 import { ServiceComparisonPage } from './ServiceComparisonPage';
 
 import { formatEnvironmentalMetric } from '../utils/environmentalMetrics';
+import {
+  resolveServiceFilterKey,
+  STATUS_CONFIG,
+  type ServiceFilterKey,
+} from '../config/statusConfig';
 
 
 type ServiceStatus = 'Ativo' | 'Indisponível' | 'Sem métricas';
@@ -29,6 +34,7 @@ interface DashboardServiceRow {
   region: string;
   city: string;
   status: ServiceStatus;
+  statusKey: ServiceFilterKey;
   consumptionKwh: number | null;
   emissionsGco2e: number | null;
   collectedAt: string | null;
@@ -364,22 +370,12 @@ const SERIES_COLORS = [
 
 function mapApiServiceToRow(service: DashboardService): DashboardServiceRow {
   const latest = service.ultima_coleta;
-  const rawStatus = service.status.toLowerCase();
-  const isUnavailable = ['indisponivel', 'indisponível', 'removido', 'unavailable'].includes(
-    rawStatus
-  );
-  const isMissingMetrics = ['sem_metricas', 'sem métricas', 'no-metrics'].includes(rawStatus);
-  const hasMetrics = Boolean(
-    latest &&
-      [latest.potencia_watts, latest.energia_kwh, latest.emissoes_gco2e].some(
-        value => value !== null
-      )
-  );
-  const status: ServiceStatus = isUnavailable
-    ? 'Indisponível'
-    : isMissingMetrics || !hasMetrics
-      ? 'Sem métricas'
-      : 'Ativo';
+  const apiStatusKey = resolveServiceFilterKey(service.status);
+  const statusKey: ServiceFilterKey =
+    apiStatusKey === 'ativo' && latest?.potencia_watts == null
+      ? 'sem_metricas'
+      : apiStatusKey;
+  const status = STATUS_CONFIG[statusKey].label;
   const country = service.regiao?.pais ?? '';
   const region = service.regiao?.regiao ?? '';
   const city = service.regiao?.cidade ?? '';
@@ -393,10 +389,15 @@ function mapApiServiceToRow(service: DashboardService): DashboardServiceRow {
     region,
     city,
     status,
+    statusKey,
     consumptionKwh: latest?.energia_kwh ?? null,
     emissionsGco2e: latest?.emissoes_gco2e ?? null,
     collectedAt: latest?.coletado_em ?? null,
   };
+}
+
+function isServiceFilterKey(value: string): value is ServiceFilterKey {
+  return value === 'ativo' || value === 'indisponível' || value === 'sem_metricas';
 }
 
 function mapServiceRowToModalData(row: DashboardServiceRow): ModalServiceData {
@@ -722,9 +723,10 @@ export const DashboardPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [countryFilter, setCountryFilter] = useState('');
   const [regionFilter, setRegionFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState<ServiceFilterKey | ''>('');
   const [cityQuery, setCityQuery] = useState('');
   const [openFilterMenu, setOpenFilterMenu] = useState<
-    'country' | 'region' | 'city' | null
+    'country' | 'region' | 'status' | 'city' | null
   >(null);
 
 
@@ -851,14 +853,26 @@ export const DashboardPage: React.FC = () => {
     ),
   ], [dashboardServices]);
 
+  const statusOptions = useMemo(() => {
+    const availableStatuses = Array.from(new Set(dashboardServices.map(service => service.statusKey)));
+    return [
+      { label: 'Todos os status', value: '' },
+      ...availableStatuses.map(status => ({
+        label: STATUS_CONFIG[status].label,
+        value: status,
+      })),
+    ];
+  }, [dashboardServices]);
+  const activeStatusFilter = statusOptions.some(option => option.value === statusFilter)
+    ? statusFilter
+    : '';
+
   const filteredCityOptions = useMemo(() => {
     const q = cityQuery.toLowerCase().trim();
     const cities = Array.from(new Set(dashboardServices.map(service => service.city).filter(Boolean)));
     if (!q) return cities.slice(0, 5);
     return cities.filter(city => city.toLowerCase().includes(q));
   }, [cityQuery, dashboardServices]);
-
-
 
   const filteredServices = useMemo(() => {
 
@@ -876,9 +890,10 @@ export const DashboardPage: React.FC = () => {
         row.location.toLowerCase().includes(term);
       const matchesCountry = !countryFilter || row.country === countryFilter;
       const matchesRegion = !regionFilter || row.region === regionFilter;
+      const matchesStatus = !activeStatusFilter || row.statusKey === activeStatusFilter;
       const matchesCity = !cityTerm || row.city.toLowerCase().includes(cityTerm);
 
-      return matchesSearch && matchesCountry && matchesRegion && matchesCity;
+      return matchesSearch && matchesCountry && matchesRegion && matchesStatus && matchesCity;
     });
 
     return [...filtered].sort((a, b) => {
@@ -889,7 +904,16 @@ export const DashboardPage: React.FC = () => {
       const valB = sortMetric === 'energy' ? (b.consumptionKwh ?? -1) : (b.emissionsGco2e ?? -1);
       return valB - valA;
     });
-  }, [dashboardServices, searchTerm, countryFilter, regionFilter, cityQuery, sortMode, sortMetric]);
+  }, [
+    dashboardServices,
+    searchTerm,
+    countryFilter,
+    regionFilter,
+    activeStatusFilter,
+    cityQuery,
+    sortMode,
+    sortMetric,
+  ]);
 
   const selectedServicesForChart = useMemo(
     () =>
@@ -928,6 +952,7 @@ export const DashboardPage: React.FC = () => {
   const clearAllFilters = () => {
     setCountryFilter('');
     setRegionFilter('');
+    setStatusFilter('');
     setCityQuery('');
 
     setSearchTerm('');
@@ -1277,9 +1302,45 @@ export const DashboardPage: React.FC = () => {
 
 
 
+        {/* Status recebido e normalizado da API */}
+
+        <div className="lg:col-span-2">
+
+          <CustomFilterSelect
+
+            label="Status"
+
+            value={activeStatusFilter}
+
+            placeholder="Todos os status"
+
+            options={statusOptions}
+
+            isOpen={openFilterMenu === 'status'}
+
+            onToggle={() =>
+
+              setOpenFilterMenu((prev) => (prev === 'status' ? null : 'status'))
+
+            }
+
+            onSelect={(value) => {
+
+              setStatusFilter(isServiceFilterKey(value) ? value : '');
+
+              setOpenFilterMenu(null);
+
+            }}
+
+          />
+
+        </div>
+
+
+
         {/* Cidade */}
 
-        <div className="relative lg:col-span-5">
+        <div className="relative lg:col-span-3">
 
           <label className="block text-xs font-medium text-[#D4E3DA] mb-1.5">Cidade</label>
 

@@ -53,7 +53,7 @@ vi.mock('../hooks/useServicesPolling', async (importOriginal) => {
         {
           id: '3',
           nome: 'Serviço Taubaté',
-          status: 'Sem métrica',
+          status: 'Sem métricas',
           localizacao: { pais: 'Brasil', regiao: 'Sudeste', cidade: 'Taubaté' },
           valores: { kwh: 12, gco2e: 5.4 },
           coords: [-23.020, -45.550],

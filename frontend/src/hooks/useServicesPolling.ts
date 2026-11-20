@@ -69,7 +69,7 @@ const FALLBACK_INITIAL_SERVICES: ServiceData[] = [
   {
     id: '3',
     nome: 'ASTAH-STU',
-    status: 'Sem métrica',
+    status: 'Sem métricas',
     localizacao: { pais: 'Brasil', regiao: 'Sudeste', cidade: 'Taubaté' },
     coords: [-23.0264, -45.5553],
     valores: { kwh: 100, gco2e: 32 }

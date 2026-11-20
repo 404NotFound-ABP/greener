@@ -1,4 +1,4 @@
-export type ServiceStatus = 'Ativo' | 'Indisponível' | 'Sem métrica' | 'Sem métricas';
+export type ServiceStatus = 'Ativo' | 'Indisponível' | 'Sem métricas';
 
 export interface LocationData {
   pais?: string | null;

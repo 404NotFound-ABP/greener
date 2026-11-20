@@ -151,6 +151,22 @@ describe('DashboardPage', () => {
     expect(tabela).toHaveTextContent('Sem leitura');
   });
 
+  it('normaliza os três estados da API e mostra texto com ícone', async () => {
+    render(<DashboardPage />);
+    await screen.findByRole('table');
+
+    const activeRow = screen.getByRole('row', { name: /Billing API/ });
+    const unavailableRow = screen.getByRole('row', { name: /Search Worker/ });
+    const noMetricsRow = screen.getByRole('row', { name: /Empty Service/ });
+
+    expect(activeRow).toHaveTextContent('Ativo');
+    expect(unavailableRow).toHaveTextContent('Indisponível');
+    expect(noMetricsRow).toHaveTextContent('Sem métricas');
+    expect(activeRow.querySelector('svg')).not.toBeNull();
+    expect(unavailableRow.querySelector('svg')).not.toBeNull();
+    expect(noMetricsRow.querySelector('svg')).not.toBeNull();
+  });
+
   it('filtra os serviços pelo nome e identificador vindos da API', async () => {
     render(<DashboardPage />);
 
@@ -171,6 +187,18 @@ describe('DashboardPage', () => {
 
     expect(screen.getByRole('row', { name: /Search Worker/ })).toBeInTheDocument();
     expect(screen.queryByRole('row', { name: /Billing API/ })).not.toBeInTheDocument();
+  });
+
+  it('filtra serviços usando os estados normalizados da API', async () => {
+    render(<DashboardPage />);
+    await screen.findByRole('table');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Todos os status' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sem métricas' }));
+
+    expect(screen.getByRole('row', { name: /Empty Service/ })).toBeInTheDocument();
+    expect(screen.queryByRole('row', { name: /Billing API/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('row', { name: /Search Worker/ })).not.toBeInTheDocument();
   });
 
   it('informa quando a busca não encontra serviços', async () => {

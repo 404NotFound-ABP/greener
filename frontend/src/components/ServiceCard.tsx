@@ -173,7 +173,7 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({
               )}
             </div>
             <span className="text-[#F2FAF5] text-[16px] font-normal leading-[24px] whitespace-nowrap">
-              {isAtivo ? 'Ativo' : isIndisponivel ? 'Indisponível' : 'Sem métrica'}
+              {isAtivo ? 'Ativo' : isIndisponivel ? 'Indisponível' : 'Sem métricas'}
             </span>
           </div>
         </div>
