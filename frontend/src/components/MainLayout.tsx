@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MapPage } from '../pages/MapPage';
 import { DashboardPage } from '../pages/DashboardPage';
+import { RankingPage } from '../pages/RankingPage';
 import { HistoricoPage } from '../pages/HistoricoPage';
 import { AccountSettingsPage } from '../pages/AccountSettingsPage';
 import { ConfigPage } from '../pages/ConfigPage';
@@ -12,7 +13,7 @@ import { LanguageSettingsPage } from '../pages/LanguageSettingsPage';
 import { PrivacySecuritySettingsPage } from '../pages/PrivacySecuritySettingsPage';
 import { AboutSettingsPage } from '../pages/AboutSettingsPage';
 
-export type MainTab = 'mapa' | 'dashboards' | 'historico' | 'config';
+export type MainTab = 'mapa' | 'dashboards' | 'ranking' | 'historico' | 'config';
 
 const MapIcon: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' }) => (
   <svg className={className} viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -44,6 +45,15 @@ const PanelsIcon: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' })
     />
     <path
       d="M7.5 20H6.25C4.86929 20 3.75 21.1193 3.75 22.5V23.75C3.75 25.1307 4.86929 26.25 6.25 26.25H7.5C8.88071 26.25 10 25.1307 10 23.75V22.5C10 21.1193 8.88071 20 7.5 20Z"
+      fill="#063819"
+    />
+  </svg>
+);
+
+const RankingIcon: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' }) => (
+  <svg className={className} viewBox="0 0 17 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      d="M0.833333 15C0.597222 15 0.399445 14.92 0.24 14.76C0.0805556 14.6 0.000555556 14.4022 0 14.1667V5.83333C0 5.59722 0.0800001 5.39944 0.24 5.24C0.4 5.08056 0.597778 5.00056 0.833333 5H3.75C3.98611 5 4.18417 5.08 4.34417 5.24C4.50417 5.4 4.58389 5.59778 4.58333 5.83333V14.1667C4.58333 14.4028 4.50333 14.6008 4.34333 14.7608C4.18333 14.9208 3.98556 15.0006 3.75 15H0.833333ZM6.875 15C6.63889 15 6.44111 14.92 6.28167 14.76C6.12222 14.6 6.04222 14.4022 6.04167 14.1667V0.833333C6.04167 0.597222 6.12167 0.399445 6.28167 0.24C6.44167 0.0805556 6.63944 0.000555556 6.875 0H9.79167C10.0278 0 10.2258 0.0800001 10.3858 0.24C10.5458 0.4 10.6256 0.597778 10.625 0.833333V14.1667C10.625 14.4028 10.545 14.6008 10.385 14.7608C10.225 14.9208 10.0272 15.0006 9.79167 15H6.875ZM12.9167 15C12.6806 15 12.4828 14.92 12.3233 14.76C12.1639 14.6 12.0839 14.4022 12.0833 14.1667V7.5C12.0833 7.26389 12.1633 7.06611 12.3233 6.90667C12.4833 6.74722 12.6811 6.66722 12.9167 6.66667H15.8333C16.0694 6.66667 16.2675 6.74667 16.4275 6.90667C16.5875 7.06667 16.6672 7.26444 16.6667 7.5V14.1667C16.6667 14.4028 16.5867 14.6008 16.4267 14.7608C16.2667 14.9208 16.0689 15.0006 15.8333 15H12.9167Z"
       fill="#063819"
     />
   </svg>
@@ -94,79 +104,101 @@ export const MainLayout: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col md:flex-row h-screen w-full bg-[#060D09] overflow-hidden font-sans">
+    <div className="flex flex-col md:flex-row h-screen w-full bg-[#060D09] overflow-hidden font-['Roboto',sans-serif]">
       {/* Navegação Desktop */}
       <nav
         aria-label="Navegação principal"
-        className="hidden md:flex w-[92px] bg-[#060D09] flex-col items-center py-6 z-50 shrink-0 border-r border-[#1A2E20]"
+        className="hidden md:flex w-[108px] bg-[#060D09] flex-col items-center py-6 z-50 shrink-0 border-r border-[#1A2E20]"
       >
-        <div className="bg-[#063819] p-1.5 rounded-[38px] flex flex-col gap-1.5 shadow-2xl border border-[#0B4B24]">
+        <div className="bg-[#063819] p-1.5 rounded-[44px] flex flex-col gap-1.5 shadow-2xl border border-[#0B4B24]">
           {/* Item 1: Mapa */}
           <button
             type="button"
             onClick={() => handleTabChange('mapa')}
-            className="flex flex-col items-center justify-center w-[62px] h-[68px] rounded-t-[30px] rounded-b-[10px] transition-colors cursor-pointer bg-[#0B4B24] hover:bg-[#136331]"
+            className="flex flex-col items-center justify-center w-[78px] h-[74px] rounded-t-[36px] rounded-b-[12px] px-1 transition-colors cursor-pointer bg-[#0B4B24] hover:bg-[#136331]"
           >
-            <div className="w-[30px] h-[30px] bg-white rounded-full flex items-center justify-center mb-1.5 shadow-sm">
+            <div className="w-[32px] h-[32px] bg-white rounded-full flex items-center justify-center mb-1.5 shadow-sm">
               <MapIcon className="w-[18px] h-[18px]" />
             </div>
-            <span className="text-[9px] font-medium text-[#F2FAF5] tracking-tight leading-none">Mapa</span>
+            <span className="text-[12px] leading-[16px] font-medium text-[#F2FAF5] tracking-tight">
+              Mapa
+            </span>
           </button>
 
           {/* Item 2: Painéis */}
           <button
             type="button"
             onClick={() => handleTabChange('dashboards')}
-            className={`flex flex-col items-center justify-center w-[62px] h-[68px] rounded-[10px] transition-colors cursor-pointer ${
+            className={`flex flex-col items-center justify-center w-[78px] h-[74px] rounded-[12px] px-1 transition-colors cursor-pointer ${
               activeTab === 'dashboards' ? 'bg-[#1F8A4C]' : 'bg-[#0B4B24] hover:bg-[#136331]'
             }`}
           >
-            <div className="w-[30px] h-[30px] bg-white rounded-full flex items-center justify-center mb-1.5 shadow-sm">
+            <div className="w-[32px] h-[32px] bg-white rounded-full flex items-center justify-center mb-1.5 shadow-sm">
               <PanelsIcon className="w-[18px] h-[18px]" />
             </div>
             <span
-              className={`text-[9px] tracking-tight leading-none text-[#F2FAF5] ${
-                activeTab === 'dashboards' ? 'font-semibold' : 'font-medium'
+              className={`text-[12px] leading-[16px] tracking-tight text-[#F2FAF5] ${
+                activeTab === 'dashboards' ? 'font-bold' : 'font-medium'
               }`}
             >
               Painéis
             </span>
           </button>
 
-          {/* Item 3: Histórico */}
+          {/* Item 3: Ranking */}
+          <button
+            type="button"
+            onClick={() => handleTabChange('ranking')}
+            className={`flex flex-col items-center justify-center w-[78px] h-[74px] rounded-[12px] px-1 transition-colors cursor-pointer ${
+              activeTab === 'ranking' ? 'bg-[#1F8A4C]' : 'bg-[#0B4B24] hover:bg-[#136331]'
+            }`}
+          >
+            <div className="w-[32px] h-[32px] bg-white rounded-full flex items-center justify-center mb-1.5 shadow-sm">
+              <RankingIcon className="w-[17px] h-[15px]" />
+            </div>
+            <span
+              className={`text-[12px] leading-[16px] tracking-tight text-[#F2FAF5] ${
+                activeTab === 'ranking' ? 'font-bold' : 'font-medium'
+              }`}
+            >
+              Ranking
+            </span>
+          </button>
+
+          {/* Item 4: Histórico */}
           <button
             type="button"
             onClick={() => handleTabChange('historico')}
-            className={`flex flex-col items-center justify-center w-[62px] h-[68px] rounded-[10px] transition-colors cursor-pointer ${
+            className={`flex flex-col items-center justify-center w-[78px] h-[74px] rounded-[12px] px-1 transition-colors cursor-pointer ${
               activeTab === 'historico' ? 'bg-[#1F8A4C]' : 'bg-[#0B4B24] hover:bg-[#136331]'
             }`}
           >
-            <div className="w-[30px] h-[30px] bg-white rounded-full flex items-center justify-center mb-1.5 shadow-sm">
+            <div className="w-[32px] h-[32px] bg-white rounded-full flex items-center justify-center mb-1.5 shadow-sm">
               <HistoryIcon className="w-[18px] h-[18px]" />
             </div>
             <span
-              className={`text-[9px] tracking-tight leading-none text-[#F2FAF5] ${
-                activeTab === 'historico' ? 'font-semibold' : 'font-medium'
+              className={`text-[12px] leading-[16px] tracking-tight text-[#F2FAF5] ${
+                activeTab === 'historico' ? 'font-bold' : 'font-medium'
               }`}
             >
               Histórico
             </span>
           </button>
 
-          {/* Item 4: Configuração */}
+          {/* Item 5: Configuração */}
           <button
             type="button"
             onClick={() => handleTabChange('config')}
-            className={`flex flex-col items-center justify-center w-[62px] h-[68px] rounded-t-[10px] rounded-b-[30px] transition-colors cursor-pointer ${
+            className={`flex flex-col items-center justify-center w-[78px] h-[74px] rounded-t-[12px] rounded-b-[36px] px-1 transition-colors cursor-pointer ${
               activeTab === 'config' ? 'bg-[#1F8A4C]' : 'bg-[#0B4B24] hover:bg-[#136331]'
             }`}
           >
-            <div className="w-[30px] h-[30px] bg-white rounded-full flex items-center justify-center mb-1.5 shadow-sm">
+            <div className="w-[32px] h-[32px] bg-white rounded-full flex items-center justify-center mb-1.5 shadow-sm">
               <SettingsIcon className="w-[18px] h-[18px]" />
             </div>
             <span
-              className={`text-[8.5px] tracking-tight leading-none text-[#F2FAF5] ${
-                activeTab === 'config' ? 'font-semibold' : 'font-medium'
+              className={`text-[11px] leading-[14px] tracking-tight text-[#F2FAF5] ${
+                activeTab === 'config' ? 'font-bold' : 'font-medium'
               }`}
             >
               Configuração
@@ -177,7 +209,12 @@ export const MainLayout: React.FC = () => {
 
       {/* Conteúdo Principal */}
       <main className="flex-1 relative overflow-y-auto pb-24 md:pb-0">
-        {activeTab === 'dashboards' && <DashboardPage />}
+        {activeTab === 'dashboards' && (
+          <DashboardPage onOpenRanking={() => handleTabChange('ranking')} />
+        )}
+        {activeTab === 'ranking' && (
+          <RankingPage onBack={() => handleTabChange('dashboards')} />
+        )}
         {activeTab === 'historico' && <HistoricoPage />}
 
         {activeTab === 'config' && activeConfigSection === null && (
@@ -216,24 +253,26 @@ export const MainLayout: React.FC = () => {
       {/* Navegação Mobile Inferior em Pílula Flutuante */}
       <nav
         aria-label="Navegação principal mobile"
-        className="md:hidden fixed bottom-3 inset-x-3 z-50 flex justify-center pointer-events-none"
+        className="md:hidden fixed bottom-3 inset-x-2 z-50 flex justify-center pointer-events-none"
       >
-        <div className="pointer-events-auto bg-[#063819]/95 backdrop-blur-md p-1.5 rounded-full flex items-center gap-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.75)] border border-[#0B4B24]">
+        <div className="pointer-events-auto bg-[#063819]/95 backdrop-blur-md p-1.5 rounded-full flex items-center gap-1 shadow-[0_12px_32px_rgba(0,0,0,0.75)] border border-[#0B4B24]">
           <button
             type="button"
             onClick={() => handleTabChange('mapa')}
-            className="flex flex-col items-center justify-center w-[68px] h-[56px] rounded-l-full rounded-r-[12px] transition-colors cursor-pointer bg-[#0B4B24] hover:bg-[#136331]"
+            className="flex flex-col items-center justify-center w-[62px] h-[58px] rounded-l-full rounded-r-[10px] transition-colors cursor-pointer bg-[#0B4B24] hover:bg-[#136331]"
           >
             <div className="w-[24px] h-[24px] bg-white rounded-full flex items-center justify-center mb-1 shadow-sm">
               <MapIcon className="w-[15px] h-[15px]" />
             </div>
-            <span className="text-[9px] font-medium text-[#F2FAF5] tracking-tight leading-none">Mapa</span>
+            <span className="text-[10.5px] font-medium text-[#F2FAF5] tracking-tight leading-none">
+              Mapa
+            </span>
           </button>
 
           <button
             type="button"
             onClick={() => handleTabChange('dashboards')}
-            className={`flex flex-col items-center justify-center w-[68px] h-[56px] rounded-[12px] transition-colors cursor-pointer ${
+            className={`flex flex-col items-center justify-center w-[62px] h-[58px] rounded-[10px] transition-colors cursor-pointer ${
               activeTab === 'dashboards' ? 'bg-[#1F8A4C]' : 'bg-[#0B4B24] hover:bg-[#136331]'
             }`}
           >
@@ -241,7 +280,7 @@ export const MainLayout: React.FC = () => {
               <PanelsIcon className="w-[15px] h-[15px]" />
             </div>
             <span
-              className={`text-[9px] tracking-tight leading-none text-[#F2FAF5] ${
+              className={`text-[10.5px] tracking-tight leading-none text-[#F2FAF5] ${
                 activeTab === 'dashboards' ? 'font-bold' : 'font-medium'
               }`}
             >
@@ -251,8 +290,27 @@ export const MainLayout: React.FC = () => {
 
           <button
             type="button"
+            onClick={() => handleTabChange('ranking')}
+            className={`flex flex-col items-center justify-center w-[62px] h-[58px] rounded-[10px] transition-colors cursor-pointer ${
+              activeTab === 'ranking' ? 'bg-[#1F8A4C]' : 'bg-[#0B4B24] hover:bg-[#136331]'
+            }`}
+          >
+            <div className="w-[24px] h-[24px] bg-white rounded-full flex items-center justify-center mb-1 shadow-sm">
+              <RankingIcon className="w-[14px] h-[13px]" />
+            </div>
+            <span
+              className={`text-[10.5px] tracking-tight leading-none text-[#F2FAF5] ${
+                activeTab === 'ranking' ? 'font-bold' : 'font-medium'
+              }`}
+            >
+              Ranking
+            </span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => handleTabChange('historico')}
-            className={`flex flex-col items-center justify-center w-[68px] h-[56px] rounded-[12px] transition-colors cursor-pointer ${
+            className={`flex flex-col items-center justify-center w-[62px] h-[58px] rounded-[10px] transition-colors cursor-pointer ${
               activeTab === 'historico' ? 'bg-[#1F8A4C]' : 'bg-[#0B4B24] hover:bg-[#136331]'
             }`}
           >
@@ -260,7 +318,7 @@ export const MainLayout: React.FC = () => {
               <HistoryIcon className="w-[15px] h-[15px]" />
             </div>
             <span
-              className={`text-[9px] tracking-tight leading-none text-[#F2FAF5] ${
+              className={`text-[10.5px] tracking-tight leading-none text-[#F2FAF5] ${
                 activeTab === 'historico' ? 'font-bold' : 'font-medium'
               }`}
             >
@@ -271,7 +329,7 @@ export const MainLayout: React.FC = () => {
           <button
             type="button"
             onClick={() => handleTabChange('config')}
-            className={`flex flex-col items-center justify-center w-[74px] h-[56px] rounded-l-[12px] rounded-r-full transition-colors cursor-pointer ${
+            className={`flex flex-col items-center justify-center w-[72px] h-[58px] rounded-l-[10px] rounded-r-full transition-colors cursor-pointer ${
               activeTab === 'config' ? 'bg-[#1F8A4C]' : 'bg-[#0B4B24] hover:bg-[#136331]'
             }`}
           >
@@ -279,7 +337,7 @@ export const MainLayout: React.FC = () => {
               <SettingsIcon className="w-[15px] h-[15px]" />
             </div>
             <span
-              className={`text-[8.5px] tracking-tight leading-none text-[#F2FAF5] ${
+              className={`text-[10px] tracking-tight leading-none text-[#F2FAF5] ${
                 activeTab === 'config' ? 'font-bold' : 'font-medium'
               }`}
             >

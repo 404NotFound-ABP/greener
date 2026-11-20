@@ -20,36 +20,34 @@ export const RegisterStep3: React.FC<RegisterStep3Props> = ({ onFinish }) => {
   };
 
   return (
-    <div className="relative min-h-screen w-full bg-[#07150E] overflow-hidden flex items-center justify-center px-4 py-6 font-sans select-none">
-      
+    <div className="relative min-h-screen w-full bg-[#07150E] overflow-x-hidden overflow-y-auto flex items-center justify-center px-4 py-8 font-sans select-none">
       {/* Container do Conjunto (Órbitas + Logo + Card) */}
-      <div className="relative w-full max-w-[600px] mt-[120px] mb-[20px] scale-[0.72] sm:scale-[0.78] lg:scale-[0.82] xl:scale-[0.84] 2xl:scale-[0.88] origin-center transition-transform duration-300">
-        
-        {/* 1. ÓRBITAS: Ancoradas a -241px do topo do Card */}
-        <div className="absolute left-1/2 -translate-x-1/2 -top-[241px] w-[1440px] h-[1024px] pointer-events-none z-0">
+      <div className="relative w-full max-w-[390px] sm:max-w-[600px] mt-[60px] sm:mt-[120px] mb-[16px] sm:mb-[20px] sm:scale-[0.78] lg:scale-[0.82] xl:scale-[0.84] 2xl:scale-[0.88] origin-center transition-transform duration-300">
+        {/* 1. ÓRBITAS */}
+        <div className="absolute left-1/2 -translate-x-1/2 -top-[165px] sm:-top-[241px] w-[1440px] h-[1024px] scale-[0.62] sm:scale-100 origin-top pointer-events-none z-0">
           <OrbitsBackground />
         </div>
 
-        {/* 2. GLOBO E LOGO: Ancorados a -103px do topo do Card */}
-        <div className="absolute left-1/2 -translate-x-1/2 -top-[103px] z-20">
+        {/* 2. GLOBO E LOGO */}
+        <div className="absolute left-1/2 -translate-x-1/2 -top-[50px] sm:-top-[103px] pointer-events-none z-20">
           <GreenerGlobeLogo />
         </div>
 
         {/* 3. FORMULÁRIO PRINCIPAL */}
         <form
           onSubmit={handleSubmit}
-          className="relative z-10 w-full pt-[165px] pb-[32px] px-[30px] bg-[rgba(242,250,245,0.12)] shadow-[0px_24px_48px_rgba(21,32,26,0.25),inset_0px_4px_4px_rgba(242,250,245,0.10)] rounded-[24px] border-t-[1px] border-r-[2px] border-b-[2px] border-l-0 border-[rgba(242,250,245,0.50)] backdrop-blur-[8px] flex flex-col gap-[24px]"
+          className="relative z-10 w-full pt-[64px] sm:pt-[165px] pb-[28px] sm:pb-[32px] px-5 sm:px-[30px] bg-[rgba(242,250,245,0.12)] shadow-[0px_24px_48px_rgba(21,32,26,0.25),inset_0px_4px_4px_rgba(242,250,245,0.10)] rounded-[24px] border-t-[1px] border-r-[2px] border-b-[2px] border-l-0 border-[rgba(242,250,245,0.50)] backdrop-blur-[8px] flex flex-col gap-4 sm:gap-[24px]"
         >
-          <div className="w-full flex flex-col gap-[16px]">
-            <p className="text-[#F2FAF5] text-[18px] sm:text-[20px] font-medium leading-[28px] text-center">
+          <div className="w-full flex flex-col gap-3 sm:gap-[16px]">
+            <p className="text-[#F2FAF5] text-[16px] sm:text-[20px] font-medium leading-[24px] sm:leading-[28px] text-center">
               Agora para finalizar, crie sua senha de acesso ao GreenER
             </p>
 
             {/* Aviso Verde */}
             <div className="w-full flex justify-start">
-              <div className="flex items-start sm:items-center gap-2 px-3 py-1.5 bg-[#CFF5DE] rounded-[10px]">
+              <div className="w-full flex items-center gap-2 px-3 py-2 sm:py-1.5 bg-[#CFF5DE] rounded-[10px]">
                 <svg
-                  className="shrink-0 mt-[2px] sm:mt-0"
+                  className="shrink-0"
                   width="20"
                   height="20"
                   viewBox="0 0 20 20"
@@ -70,48 +68,41 @@ export const RegisterStep3: React.FC<RegisterStep3Props> = ({ onFinish }) => {
                     </clipPath>
                   </defs>
                 </svg>
-                <span className="text-[#0B7335] text-[13px] font-semibold text-left">
+                <span className="text-[#0B7335] text-[12px] sm:text-[13px] font-semibold text-left">
                   Você poderá alterar depois
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="w-full flex flex-col gap-[24px]">
+          <div className="w-full flex flex-col gap-4 sm:gap-[24px]">
             {/* Campo: Criar Senha */}
-            <div className="w-full h-[56px] px-[20px] bg-[#F2FAF5]/20 rounded-[12px] border-[1.5px] border-[#F2FAF5] flex items-center focus-within:border-[#14C45A] transition-colors">
+            <div className="w-full h-[50px] sm:h-[56px] px-4 sm:px-[20px] bg-[#F2FAF5]/20 rounded-[12px] border-[1.5px] border-[#F2FAF5] flex items-center focus-within:border-[#14C45A] transition-colors">
               <input
                 type="password"
                 value={senha}
                 onChange={(e) => setSenha(e.target.value)}
                 placeholder="Crie aqui sua senha"
                 required
-                className="w-full bg-transparent text-[#F7F7F5] placeholder-[#F7F7F5] text-[16px] font-normal outline-none"
+                className="w-full bg-transparent text-[#F7F7F5] placeholder-[#F7F7F5]/90 text-[15px] sm:text-[16px] font-normal outline-none"
               />
             </div>
 
             {/* Campo: Repetir Senha */}
-            <div className="w-full h-[56px] px-[20px] bg-[#F2FAF5]/20 rounded-[12px] border-[1.5px] border-[#F2FAF5] flex items-center focus-within:border-[#14C45A] transition-colors">
+            <div className="w-full h-[50px] sm:h-[56px] px-4 sm:px-[20px] bg-[#F2FAF5]/20 rounded-[12px] border-[1.5px] border-[#F2FAF5] flex items-center focus-within:border-[#14C45A] transition-colors">
               <input
                 type="password"
                 value={confirmarSenha}
                 onChange={(e) => setConfirmarSenha(e.target.value)}
                 placeholder="Repita a senha para confirmação"
                 required
-                className="w-full bg-transparent text-[#F7F7F5] placeholder-[#F7F7F5] text-[16px] font-normal outline-none"
+                className="w-full bg-transparent text-[#F7F7F5] placeholder-[#F7F7F5]/90 text-[15px] sm:text-[16px] font-normal outline-none"
               />
             </div>
           </div>
 
           {/* Botão Finalizar */}
-          <div className="w-full flex justify-end mt-[8px]">
-            <button
-              type="submit"
-              className="h-[48px] px-[28px] bg-[#2FA862] hover:bg-[#14C45A] rounded-[10px] flex justify-center items-center text-white text-[16px] font-medium transition-colors cursor-pointer shadow-lg"
-            >
-              Finalizar
-            </button>
-          </div>
+          <div className="w-full flex justify-end mt-1 sm:mt-[8px]"></div>
         </form>
       </div>
     </div>
