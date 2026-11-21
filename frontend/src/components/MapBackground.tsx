@@ -214,6 +214,7 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
   const markerRefs = useRef<Record<string, L.CircleMarker | null>>({});
 
   const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
+  const hasAutoFocusedServices = useRef(false);
   const [previewTiles, setPreviewTiles] = useState(() =>
     getPreviewTileUrls(DEFAULT_CENTER[0], DEFAULT_CENTER[1], DEFAULT_ZOOM)
   );
@@ -339,6 +340,23 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
     return { mappableMarkers: valid, servicesWithoutCoordsCount: missingCoords };
   }, [filteredServices]);
   const visibleMarkers = mappableMarkers.filter(({ service }) => !hiddenServiceIds.has(service.id));
+
+  useEffect(() => {
+    if (
+      selectedListService &&
+      !filteredServices.some(service => service.id === selectedListService.id)
+    ) {
+      setSelectedListService(null);
+    }
+  }, [filteredServices, selectedListService]);
+
+  useEffect(() => {
+    if (!mapInstance || hasAutoFocusedServices.current || mappableMarkers.length === 0) return;
+
+    const bounds = L.latLngBounds(mappableMarkers.map(({ coords }) => coords));
+    mapInstance.fitBounds(bounds, { padding: [36, 36], maxZoom: DEFAULT_ZOOM });
+    hasAutoFocusedServices.current = true;
+  }, [mapInstance, mappableMarkers]);
 
   const handleToggleServiceMarker = (service: ServiceData) => {
     setHiddenServiceIds(current => {
@@ -528,6 +546,22 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
             >
               Tentar novamente
             </button>
+            <button
+              type="button"
+              onClick={handleOpenServicesList}
+              className="underline text-amber-300 hover:text-amber-200 text-[11px] font-medium shrink-0 cursor-pointer"
+            >
+              Acessar serviços
+            </button>
+            {onSelectTab && (
+              <button
+                type="button"
+                onClick={() => onSelectTab('dashboards')}
+                className="underline text-amber-300 hover:text-amber-200 text-[11px] font-medium shrink-0 cursor-pointer"
+              >
+                Abrir dashboards
+              </button>
+            )}
           </div>
         )}
 

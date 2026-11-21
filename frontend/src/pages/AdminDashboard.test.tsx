@@ -14,7 +14,7 @@ describe('painel administrativo', () => {
   it('filtra usuários pelo nome digitado', () => {
     render(<AdminDashboard />);
 
-    fireEvent.change(screen.getByPlaceholderText('Busque por um usuário aqui...'), {
+    fireEvent.change(screen.getByPlaceholderText('Busque por um usuário...'), {
       target: { value: 'Carlos' },
     });
 

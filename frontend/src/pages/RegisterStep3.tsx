@@ -102,7 +102,14 @@ export const RegisterStep3: React.FC<RegisterStep3Props> = ({ onFinish }) => {
           </div>
 
           {/* Botão Finalizar */}
-          <div className="w-full flex justify-end mt-1 sm:mt-[8px]"></div>
+          <div className="w-full flex justify-end mt-1 sm:mt-[8px]">
+            <button
+              type="submit"
+              className="px-6 py-2.5 rounded-[10px] bg-[#1F8A4C] hover:bg-[#2FA862] text-white font-semibold transition-colors cursor-pointer"
+            >
+              Finalizar
+            </button>
+          </div>
         </form>
       </div>
     </div>

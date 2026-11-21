@@ -1317,11 +1317,15 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onOpenRanking }) =
 
         {/* Estado vazio */}
         {filteredServices.length === 0 ? (
-          <div className="py-12 px-4 text-center border-2 border-dashed border-[#385E47] rounded-xl bg-[#09180F]">
+          <div
+            className="py-12 px-4 text-center border-2 border-dashed border-[#385E47] rounded-xl bg-[#09180F]"
+            role={isInitialLoad && services.length === 0 ? 'status' : hasError && services.length === 0 ? 'alert' : undefined}
+            aria-live={isInitialLoad && services.length === 0 ? 'polite' : undefined}
+          >
             <p className="text-sm font-medium text-[#F2FAF5] mb-1">
-              {isInitialLoad
+              {isInitialLoad && services.length === 0
                 ? 'Carregando serviços'
-                : hasError && summary === null
+                : hasError && services.length === 0
                   ? 'Não foi possível carregar os serviços'
                   : services.length === 0
                     ? 'A API não retornou serviços'
@@ -1329,22 +1333,23 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onOpenRanking }) =
             </p>
 
             <p className="text-xs text-[#9DB0A4] mb-4">
-              {isInitialLoad
+              {isInitialLoad && services.length === 0
                 ? 'A lista será exibida assim que os dados da API forem recebidos.'
-                : hasError && summary === null
+                : hasError && services.length === 0
                   ? 'Verifique a conexão e tente carregar novamente.'
                   : services.length === 0
                     ? 'Não há serviços cadastrados para exibir.'
                     : 'Não existem serviços correspondentes aos filtros aplicados.'}
             </p>
 
-            {hasError && summary === null ? (
+            {hasError && services.length === 0 ? (
               <button
                 type="button"
                 onClick={() => void triggerRefresh()}
-                className="px-3.5 py-1.5 rounded-lg bg-[#1F8A4C] hover:bg-[#2FA862] text-white text-xs font-medium transition-colors cursor-pointer"
+                disabled={isRefreshing}
+                className="px-3.5 py-1.5 rounded-lg bg-[#1F8A4C] hover:bg-[#2FA862] disabled:opacity-60 disabled:cursor-wait text-white text-xs font-medium transition-colors cursor-pointer"
               >
-                Tentar novamente
+                {isRefreshing ? 'Tentando novamente…' : 'Tentar novamente'}
               </button>
             ) : services.length > 0 && filteredServices.length === 0 ? (
               <button
