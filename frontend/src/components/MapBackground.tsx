@@ -12,7 +12,7 @@ import type { ServiceData } from '../types/service';
 import { matchesServiceStatus } from '../config/statusConfig';
 import {
   CallbackServiceRepository,
-  defaultServiceRepository,
+  HttpServiceRepository,
   type ServiceRepository
 } from '../adapters/serviceAdapter';
 import { useServicesPolling } from '../hooks/useServicesPolling';
@@ -23,6 +23,11 @@ export interface MapBackgroundProps {
   repository?: ServiceRepository;
   onFetchServices?: () => Promise<ServiceData[]>;
 }
+
+const DEFAULT_CENTER: [number, number] = [-23.3053, -45.9658];
+const DEFAULT_ZOOM = 13;
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api').replace(/\/+$/, '');
+const mapServiceRepository = new HttpServiceRepository(`${API_BASE_URL}/servidores`);
 
 const themes = {
   dark: {
@@ -37,53 +42,88 @@ const themes = {
   }
 };
 
-const previewTiles = {
-  satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/13/4655/3050',
-  dark: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/13/4655/3050'
-};
+function getPreviewTileUrls(lat: number, lng: number, zoom: number) {
+  const z = Math.min(17, Math.max(1, Math.round(zoom)));
+  const n = Math.pow(2, z);
+  const x = Math.floor(((lng + 180) / 360) * n);
+  const latRad = (lat * Math.PI) / 180;
+  const y = Math.floor(
+    ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n
+  );
+
+  return {
+    // Esri World Imagery usa ordem {z}/{y}/{x}
+    satellite: `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`,
+    // OpenStreetMap usa ordem {z}/{x}/{y}
+    dark: `https://tile.openstreetmap.org/${z}/${x}/${y}.png`
+  };
+}
+
+function parseCoordNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'boolean') return null;
+  const parsed = typeof value === 'number' ? value : Number(String(value).trim().replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : null;
+}
 
 /**
  * Extrai e valida coordenadas de múltiplos formatos possíveis vindos da API.
  * Retorna null quando ausentes, nulas, vazias ou fora da faixa geográfica válida.
  */
-export function extractValidCoordinates(service: ServiceData): [number, number] | null {
+function extractValidCoordinates(service: ServiceData): [number, number] | null {
   const raw = service as ServiceData & {
     coordenadas?:
       | {
-          lat?: number | null;
-          lng?: number | null;
-          latitude?: number | null;
-          longitude?: number | null;
+          lat?: number | string | null;
+          lng?: number | string | null;
+          latitude?: number | string | null;
+          longitude?: number | string | null;
         }
-      | [number, number]
+      | [number | string, number | string]
       | null;
-    coords?: [number, number] | null;
-    latitude?: number | null;
-    longitude?: number | null;
-    lat?: number | null;
-    lng?: number | null;
+    coords?: [number | string, number | string] | null;
+    latitude?: number | string | null;
+    longitude?: number | string | null;
+    lat?: number | string | null;
+    lng?: number | string | null;
+    localizacao?: {
+      lat?: number | string | null;
+      lng?: number | string | null;
+      latitude?: number | string | null;
+      longitude?: number | string | null;
+    } | null;
   };
 
-  let lat: number | null | undefined;
-  let lng: number | null | undefined;
+  let rawLat: unknown;
+  let rawLng: unknown;
 
   if (Array.isArray(raw.coords)) {
-    [lat, lng] = raw.coords;
+    [rawLat, rawLng] = raw.coords;
   } else if (Array.isArray(raw.coordenadas)) {
-    [lat, lng] = raw.coordenadas;
+    [rawLat, rawLng] = raw.coordenadas;
   } else if (raw.coordenadas && typeof raw.coordenadas === 'object' && !Array.isArray(raw.coordenadas)) {
-    lat = raw.coordenadas.lat ?? raw.coordenadas.latitude;
-    lng = raw.coordenadas.lng ?? raw.coordenadas.longitude;
+    rawLat = raw.coordenadas.lat ?? raw.coordenadas.latitude;
+    rawLng = raw.coordenadas.lng ?? raw.coordenadas.longitude;
+  } else if (
+    raw.localizacao &&
+    (raw.localizacao.lat !== undefined ||
+      raw.localizacao.latitude !== undefined ||
+      raw.localizacao.lng !== undefined ||
+      raw.localizacao.longitude !== undefined)
+  ) {
+    rawLat = raw.localizacao.lat ?? raw.localizacao.latitude;
+    rawLng = raw.localizacao.lng ?? raw.localizacao.longitude;
   } else {
-    lat = raw.latitude ?? raw.lat;
-    lng = raw.longitude ?? raw.lng;
+    rawLat = raw.latitude ?? raw.lat;
+    rawLng = raw.longitude ?? raw.lng;
   }
 
+  const lat = parseCoordNumber(rawLat);
+  const lng = parseCoordNumber(rawLng);
+
   if (
-    typeof lat !== 'number' ||
-    typeof lng !== 'number' ||
-    !Number.isFinite(lat) ||
-    !Number.isFinite(lng) ||
+    lat === null ||
+    lng === null ||
     lat < -90 ||
     lat > 90 ||
     lng < -180 ||
@@ -98,7 +138,7 @@ export function extractValidCoordinates(service: ServiceData): [number, number] 
 /**
  * Formata a localização textual tratando ausência parcial ou total de cidade, região e país (T23.2/US10).
  */
-export function formatServiceLocation(localizacao?: {
+function formatServiceLocation(localizacao?: {
   cidade?: string | null;
   regiao?: string | null;
   pais?: string | null;
@@ -133,7 +173,12 @@ function mapStatusToModalStatus(status: string): ModalServiceData['status'] {
   if (normalized === 'ativo' || normalized === 'online' || normalized === 'active') {
     return 'ativo';
   }
-  if (normalized === 'indisponivel' || normalized === 'indisponível' || normalized === 'offline' || normalized === 'inactive') {
+  if (
+    normalized === 'indisponivel' ||
+    normalized === 'indisponível' ||
+    normalized === 'offline' ||
+    normalized === 'inactive'
+  ) {
     return 'indisponível';
   }
   return 'sem_metricas';
@@ -142,11 +187,15 @@ function mapStatusToModalStatus(status: string): ModalServiceData['status'] {
 function toModalServiceData(service: ServiceData): ModalServiceData {
   const loc = formatServiceLocation(service.localizacao);
   return {
-    ...(service as unknown as ModalServiceData),
     id: service.id,
     name: service.nome || 'Serviço sem nome',
     status: mapStatusToModalStatus(service.status),
-    location: loc.text
+    location: loc.text,
+    kwh: service.valores?.kwh ?? null,
+    co2: service.valores?.gco2e ?? service.valores?.kgco2e ?? null,
+    period: service.valores?.periodo ?? service.periodo,
+    isEstimated: service.valores?.estimado ?? service.estimado,
+    lastUpdate: service.ultimaAtualizacao
   };
 }
 
@@ -162,11 +211,18 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuContainerRef = useRef<HTMLDivElement | null>(null);
+  const markerRefs = useRef<Record<string, L.CircleMarker | null>>({});
 
   const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
+  const hasAutoFocusedServices = useRef(false);
+  const [previewTiles, setPreviewTiles] = useState(() =>
+    getPreviewTileUrls(DEFAULT_CENTER[0], DEFAULT_CENTER[1], DEFAULT_ZOOM)
+  );
   const [tileErrorCount, setTileErrorCount] = useState(0);
   const [tileRetryKey, setTileRetryKey] = useState(0);
   const [selectedListService, setSelectedListService] = useState<ServiceData | null>(null);
+  const [isEmptyBannerDismissed, setIsEmptyBannerDismissed] = useState(false);
+  const [hiddenServiceIds, setHiddenServiceIds] = useState<ReadonlySet<string>>(() => new Set());
 
   const [activeFilters, setActiveFilters] = useState({
     ativo: true,
@@ -177,11 +233,30 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
   const resolvedRepository = useMemo<ServiceRepository>(() => {
     if (repository) return repository;
     if (onFetchServices) return new CallbackServiceRepository(onFetchServices);
-    return defaultServiceRepository;
+    return mapServiceRepository;
   }, [repository, onFetchServices]);
 
-  const pollingState = useServicesPolling({ repository: resolvedRepository });
+  const pollingState = useServicesPolling({
+    repository: resolvedRepository,
+    initialServices: [],
+    loadPollingIntervalFromApi: true
+  });
   const { services, isRefreshing, hasError, triggerRefresh } = pollingState;
+
+  useEffect(() => {
+    if (!mapInstance) return;
+
+    const syncPreviewTiles = () => {
+      const center = mapInstance.getCenter();
+      setPreviewTiles(getPreviewTileUrls(center.lat, center.lng, mapInstance.getZoom()));
+    };
+
+    syncPreviewTiles();
+    mapInstance.on('moveend', syncPreviewTiles);
+    return () => {
+      mapInstance.off('moveend', syncPreviewTiles);
+    };
+  }, [mapInstance]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -205,6 +280,7 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
     if (mapInstance) {
       mapInstance.closePopup();
     }
+    setIsEmptyBannerDismissed(false);
     setTimeout(() => {
       setActiveFilters(prev => ({ ...prev, [status]: !prev[status] }));
     }, 50);
@@ -214,6 +290,7 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
     if (mapInstance) {
       mapInstance.closePopup();
     }
+    setIsEmptyBannerDismissed(false);
     setActiveFilters({
       ativo: true,
       indisponível: true,
@@ -262,14 +339,49 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
 
     return { mappableMarkers: valid, servicesWithoutCoordsCount: missingCoords };
   }, [filteredServices]);
+  const visibleMarkers = mappableMarkers.filter(({ service }) => !hiddenServiceIds.has(service.id));
+
+  useEffect(() => {
+    if (
+      selectedListService &&
+      !filteredServices.some(service => service.id === selectedListService.id)
+    ) {
+      setSelectedListService(null);
+    }
+  }, [filteredServices, selectedListService]);
+
+  useEffect(() => {
+    if (!mapInstance || hasAutoFocusedServices.current || mappableMarkers.length === 0) return;
+
+    const bounds = L.latLngBounds(mappableMarkers.map(({ coords }) => coords));
+    mapInstance.fitBounds(bounds, { padding: [36, 36], maxZoom: DEFAULT_ZOOM });
+    hasAutoFocusedServices.current = true;
+  }, [mapInstance, mappableMarkers]);
+
+  const handleToggleServiceMarker = (service: ServiceData) => {
+    setHiddenServiceIds(current => {
+      const next = new Set(current);
+      if (next.has(service.id)) {
+        next.delete(service.id);
+      } else {
+        next.add(service.id);
+      }
+      return next;
+    });
+  };
 
   const handleSelectServiceFromList = (service: ServiceData) => {
     const coords = extractValidCoordinates(service);
     if (coords && mapInstance) {
-      mapInstance.flyTo(coords, Math.max(mapInstance.getZoom(), 13), { duration: 0.7 });
       setSelectedListService(null);
+      mapInstance.flyTo(coords, Math.max(mapInstance.getZoom(), 13), { duration: 0.7 });
+      const marker = markerRefs.current[String(service.id)];
+      if (marker) {
+        setTimeout(() => {
+          marker.openPopup();
+        }, 350);
+      }
     } else {
-      // Serviço sem coordenadas: abre os detalhes diretamente em modal sem depender do mapa
       setSelectedListService(service);
     }
   };
@@ -298,7 +410,8 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
 
   const hasMapLayerFailure = tileErrorCount >= 4;
   const isInitialLoading = isRefreshing && services.length === 0;
-  const showEmptyMarkersBanner = !isInitialLoading && mappableMarkers.length === 0;
+  const showEmptyMarkersBanner =
+    !isInitialLoading && mappableMarkers.length === 0 && !isEmptyBannerDismissed;
 
   return (
     <div className={`relative w-full h-full bg-neutro-900 ${themes[currentTheme].cssClass}`}>
@@ -317,11 +430,14 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
         repository={resolvedRepository}
         pollingState={pollingState}
         onSelectService={handleSelectServiceFromList}
+        hiddenServiceIds={hiddenServiceIds}
+        onToggleServiceMarker={handleToggleServiceMarker}
       />
 
       <style>{`
-        .leaflet-popup-content-wrapper { background: transparent !important; box-shadow: none !important; padding: 0 !important; }
-        .leaflet-popup-content { margin: 0 !important; width: auto !important; }
+        .leaflet-popup { max-width: calc(100vw - 24px) !important; }
+        .leaflet-popup-content-wrapper { background: transparent !important; box-shadow: none !important; padding: 0 !important; max-width: 100% !important; }
+        .leaflet-popup-content { margin: 0 !important; width: auto !important; max-width: 100% !important; }
         .leaflet-popup-tip-container { display: none !important; }
         .leaflet-container { background: #0b1116 !important; }
         
@@ -335,8 +451,8 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
           ========================================================= */}
       <MapContainer
         ref={setMapInstance}
-        center={[-23.3053, -45.9658]}
-        zoom={13}
+        center={DEFAULT_CENTER}
+        zoom={DEFAULT_ZOOM}
         className="w-full h-full z-0"
         zoomControl={false}
       >
@@ -344,6 +460,9 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
           key={`${currentTheme}-${tileRetryKey}`}
           attribution={themes[currentTheme].attribution}
           url={themes[currentTheme].url}
+          maxZoom={19}
+          updateWhenZooming={false}
+          keepBuffer={2}
           eventHandlers={{
             tileerror: () => setTileErrorCount(prev => prev + 1),
             tileload: () => {
@@ -352,20 +471,36 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
           }}
         />
 
-        {mappableMarkers.map(({ service, modalData, coords }) => (
+        {visibleMarkers.map(({ service, modalData, coords }) => (
           <CircleMarker
             key={service.id}
+            ref={el => {
+              markerRefs.current[String(service.id)] = el;
+            }}
             center={coords}
             pathOptions={{
               color: getMarkerColor(modalData.status),
               fillColor: getMarkerColor(modalData.status),
-              fillOpacity: 0.8
+              fillOpacity: 0.85
             }}
             radius={14}
           >
             <Tooltip>{modalData.name} (Clique para abrir)</Tooltip>
-            <Popup closeButton={false} offset={[0, -10]}>
-              <ServiceModal service={modalData} />
+            <Popup
+              closeButton={false}
+              maxWidth={460}
+              autoPanPaddingTopLeft={[16, 76]}
+              autoPanPaddingBottomRight={[16, 90]}
+              offset={[0, -8]}
+            >
+              <ServiceModal
+                service={modalData}
+                onClose={() => mapInstance?.closePopup()}
+                onOpenDashboard={() => {
+                  mapInstance?.closePopup();
+                  onSelectTab?.('dashboards');
+                }}
+              />
             </Popup>
           </CircleMarker>
         ))}
@@ -379,7 +514,6 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
           isSidebarMinimized ? 'left-4 sm:left-[290px]' : 'left-4 sm:left-[452px]'
         }`}
       >
-        {/* 1. Carregamento inicial */}
         {isInitialLoading && (
           <div
             role="status"
@@ -390,7 +524,6 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
           </div>
         )}
 
-        {/* 2. Falha no carregamento do mapa ou da API */}
         {(hasMapLayerFailure || hasError) && (
           <div
             role="alert"
@@ -413,10 +546,25 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
             >
               Tentar novamente
             </button>
+            <button
+              type="button"
+              onClick={handleOpenServicesList}
+              className="underline text-amber-300 hover:text-amber-200 text-[11px] font-medium shrink-0 cursor-pointer"
+            >
+              Acessar serviços
+            </button>
+            {onSelectTab && (
+              <button
+                type="button"
+                onClick={() => onSelectTab('dashboards')}
+                className="underline text-amber-300 hover:text-amber-200 text-[11px] font-medium shrink-0 cursor-pointer"
+              >
+                Abrir dashboards
+              </button>
+            )}
           </div>
         )}
 
-        {/* 3. Aviso de serviços sem coordenadas disponíveis na lista */}
         {!isInitialLoading && servicesWithoutCoordsCount > 0 && mappableMarkers.length > 0 && (
           <div className="pointer-events-auto px-3.5 py-2 rounded-[12px] bg-[#081C12]/90 backdrop-blur-xl border border-amber-400/50 text-[#F2FAF5] text-[12px] flex items-center gap-2.5 shadow-xl">
             <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
@@ -436,21 +584,39 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
           </div>
         )}
 
-        {/* 4. Ausência total de marcadores no mapa (por filtro ou falta de coordenadas) */}
         {showEmptyMarkersBanner && (
           <div
             role="status"
             className="pointer-events-auto max-w-md px-4 py-3 rounded-[16px] bg-[#081C12]/92 backdrop-blur-xl border border-[#F2FAF5]/40 text-[#F2FAF5] text-[12px] sm:text-[13px] flex flex-col gap-2 shadow-2xl"
           >
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" />
-              <span className="font-semibold">
-                {services.length === 0
-                  ? 'Nenhum serviço disponível no momento'
-                  : filteredServices.length === 0
-                  ? 'Nenhum marcador corresponde aos filtros selecionados'
-                  : 'Nenhum serviço filtrado possui coordenadas para exibição no mapa'}
-              </span>
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" />
+                <span className="font-semibold">
+                  {services.length === 0
+                    ? 'Nenhum serviço disponível no momento'
+                    : filteredServices.length === 0
+                    ? 'Nenhum marcador corresponde aos filtros selecionados'
+                    : 'Nenhum serviço filtrado possui coordenadas para exibição no mapa'}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsEmptyBannerDismissed(true)}
+                aria-label="Fechar aviso"
+                title="Fechar aviso"
+                className="w-6 h-6 -mt-0.5 -mr-1 rounded-full flex items-center justify-center text-[#DDF1E5]/70 hover:text-[#F2FAF5] hover:bg-[#F2FAF5]/15 transition-colors shrink-0 cursor-pointer"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none">
+                  <path
+                    d="M3 3L11 11M11 3L3 11"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
             </div>
             <p className="text-[#DDF1E5]/85 text-[11px] sm:text-[12px] leading-relaxed">
               {filteredServices.length > 0
@@ -494,7 +660,6 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
 
       {/* =========================================================
           MODAL DE DETALHES PARA SERVIÇOS SELECIONADOS PELA LISTA
-          (Garante acesso total mesmo sem coordenadas no mapa)
           ========================================================= */}
       {selectedListService && (
         <div
@@ -502,21 +667,17 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
           aria-modal="true"
           aria-label={`Detalhes de ${selectedListService.nome}`}
           onClick={() => setSelectedListService(null)}
-          className="fixed inset-0 z-[1050] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+          className="fixed inset-0 z-[1050] bg-black/20 flex items-center justify-center p-3 sm:p-4"
         >
-          <div
-            onClick={e => e.stopPropagation()}
-            className="relative flex flex-col items-end gap-2"
-          >
-            <button
-              type="button"
-              onClick={() => setSelectedListService(null)}
-              aria-label="Fechar detalhes do serviço"
-              className="px-3 py-1 rounded-full bg-[#081C12] border border-[#F2FAF5]/50 text-[#F2FAF5] text-[12px] hover:bg-[#1F8A4C] transition-colors cursor-pointer"
-            >
-              Fechar ✕
-            </button>
-            <ServiceModal service={toModalServiceData(selectedListService)} />
+          <div onClick={e => e.stopPropagation()} className="relative max-w-full">
+            <ServiceModal
+              service={toModalServiceData(selectedListService)}
+              onClose={() => setSelectedListService(null)}
+              onOpenDashboard={() => {
+                setSelectedListService(null);
+                onSelectTab?.('dashboards');
+              }}
+            />
           </div>
         </div>
       )}
@@ -662,7 +823,7 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
         type="button"
         onClick={toggleTheme}
         title={currentTheme === 'dark' ? 'Mudar para Satélite' : 'Mudar para Escuro'}
-        className={`group absolute ${mobileFloatingBottomClass} sm:bottom-4 left-4 z-[1000] w-[72px] h-[72px] sm:w-[100px] sm:h-[100px] rounded-[6px] overflow-hidden border border-neutro-50 shadow-2xl transition-all duration-300 cursor-pointer ${
+        className={`group absolute ${mobileFloatingBottomClass} sm:bottom-4 left-4 z-[1000] w-[72px] h-[72px] sm:w-[100px] sm:h-[100px] rounded-[6px] overflow-hidden border border-neutro-50 bg-[#0b1116] shadow-2xl transition-all duration-300 cursor-pointer ${
           isSidebarMinimized ? 'sm:left-4' : 'sm:left-[452px]'
         }`}
       >
@@ -671,7 +832,7 @@ export const MapBackground: React.FC<MapBackgroundProps> = ({
           alt={currentTheme === 'dark' ? 'Prévia Satélite' : 'Prévia Escuro'}
           style={
             currentTheme === 'satellite'
-              ? { filter: 'invert(100%) hue-rotate(180deg) brightness(90%) contrast(105%)' }
+              ? { filter: 'invert(100%) hue-rotate(180deg) brightness(90%) contrast(105%) saturate(85%)' }
               : undefined
           }
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"

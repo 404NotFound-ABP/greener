@@ -1,580 +1,525 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { StatusBadge } from '../components/StatusBadge';
-import { ServiceModal } from '../components/ServiceModal';
-import type { ModalServiceData } from '../components/ServiceModal';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { FormEvent } from 'react';
 
-interface HistoryEventRow {
-  id: string;
-  sub: string;
-  loc: string;
-  date: string;
-  timestamp: number;
-  event: string;
-  status: 'Ativo' | 'Indisponível' | 'Sem métricas' | 'Removido';
+interface ColetaMetrica {
+  id: number;
+  servidorId: string;
+  codigoRegiao: string | null;
+  status: string;
+  intervaloSegundos: number | null;
+  cpuPercent: string | number | null;
+  memoriaGb: string | number | null;
+  discoGb: string | number | null;
+  redeGb: string | number | null;
+  potenciaWatts: string | number | null;
+  energiaKwh: string | number | null;
+  carbonIntensityFator: string | number | null;
+  emissoesGco2e: string | number | null;
+  coletadoEm: string;
 }
 
-const historyData: HistoryEventRow[] = [
-  {
-    id: 'ASTAH-XYZ',
-    sub: 'ID 0041',
-    loc: 'São Francisco - EUA',
-    date: '17/10/2026 14:20',
-    timestamp: 1792257600000,
-    event: 'Perdeu conexão',
-    status: 'Indisponível',
-  },
-  {
-    id: 'ASTAH-ABC',
-    sub: 'ID 0042',
-    loc: 'Tóquio - Japão',
-    date: '17/10/2026 11:45',
-    timestamp: 1792248300000,
-    event: 'Serviço descoberto',
-    status: 'Ativo',
-  },
-  {
-    id: 'ASTAH-DEF',
-    sub: 'ID 0043',
-    loc: 'Berlim - Alemanha',
-    date: '16/10/2026 10:00',
-    timestamp: 1792155600000,
-    event: 'Parou de enviar métricas',
-    status: 'Sem métricas',
-  },
-  {
-    id: 'ASTAH-GHI',
-    sub: 'ID 0044',
-    loc: 'Londres - Reino Unido',
-    date: '15/10/2026 09:15',
-    timestamp: 1792066500000,
-    event: 'Conectado',
-    status: 'Ativo',
-  },
-  {
-    id: 'ASTAH-JKL',
-    sub: 'ID 0045',
-    loc: 'Sydney - Austrália',
-    date: '13/10/2026 08:30',
-    timestamp: 1791891000000,
-    event: 'Serviço removido',
-    status: 'Removido',
-  },
-  {
-    id: 'ASTAH-MNO',
-    sub: 'ID 0046',
-    loc: 'Canberra - Austrália',
-    date: '12/10/2026 14:32',
-    timestamp: 1791826320000,
-    event: 'Conectado',
-    status: 'Ativo',
-  },
+type StatusColeta = string;
+type FiltrosAplicados = {
+  servidorId: string;
+  busca: string;
+  inicio: number;
+  fim: number;
+};
+
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api').replace(/\/$/, '');
+const HISTORICO_URL = `${API_BASE_URL}/coleta/historico`;
+const LIMITE_HISTORICO = 10000;
+const ITENS_POR_PAGINA = 10;
+
+const formatDateInput = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const parseDateInput = (value: string): Date | null => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+
+  const [, yearText, monthText, dayText] = match;
+  const date = new Date(Number(yearText), Number(monthText) - 1, Number(dayText));
+  if (
+    date.getFullYear() !== Number(yearText) ||
+    date.getMonth() !== Number(monthText) - 1 ||
+    date.getDate() !== Number(dayText)
+  ) {
+    return null;
+  }
+  return date;
+};
+
+const isColetaMetrica = (value: unknown): value is ColetaMetrica => {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.id === 'number' &&
+    typeof record.servidorId === 'string' &&
+    typeof record.status === 'string' &&
+    typeof record.coletadoEm === 'string' &&
+    !Number.isNaN(Date.parse(record.coletadoEm))
+  );
+};
+
+const getStatusLabel = (status: string): StatusColeta => {
+  const normalized = status.toLowerCase().trim();
+  if (normalized === 'disponivel' || normalized === 'disponível' || normalized === 'ativo') {
+    return 'Disponível';
+  }
+  if (normalized === 'indisponivel' || normalized === 'indisponível') return 'Indisponível';
+  if (normalized === 'sem_metricas' || normalized === 'sem métricas') return 'Sem métricas';
+  return status;
+};
+
+const getStatusClass = (status: string): string => {
+  const label = getStatusLabel(status);
+  if (label === 'Disponível') return 'border-[#14C45A] bg-[#2FA862]/20 text-[#B9F6CE]';
+  if (label === 'Indisponível') return 'border-[#F35B1B] bg-[#9E2B25]/30 text-[#FFD1C2]';
+  return 'border-[#B5BDB8] bg-[#46524B]/40 text-[#E1E7E3]';
+};
+
+const formatDateTime = (value: string): string =>
+  new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'medium',
+  }).format(new Date(value));
+
+const formatMetric = (value: string | number | null, unit: string): string => {
+  if (value === null || value === '') return 'Não informado';
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return 'Valor inválido';
+  return `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 6 }).format(numericValue)} ${unit}`;
+};
+
+const METRICAS: Array<{
+  label: string;
+  field: keyof Pick<
+    ColetaMetrica,
+    | 'cpuPercent'
+    | 'memoriaGb'
+    | 'discoGb'
+    | 'redeGb'
+    | 'potenciaWatts'
+    | 'energiaKwh'
+    | 'carbonIntensityFator'
+    | 'emissoesGco2e'
+    >;
+  unit: string;
+}> = [
+  { label: 'CPU', field: 'cpuPercent', unit: '%' },
+  { label: 'Memória', field: 'memoriaGb', unit: 'GB' },
+  { label: 'Disco', field: 'discoGb', unit: 'GB' },
+  { label: 'Rede', field: 'redeGb', unit: 'GB' },
+  { label: 'Potência', field: 'potenciaWatts', unit: 'W' },
+  { label: 'Energia', field: 'energiaKwh', unit: 'kWh' },
+  { label: 'Intensidade de carbono', field: 'carbonIntensityFator', unit: 'gCO₂e/kWh' },
+  { label: 'Emissões', field: 'emissoesGco2e', unit: 'gCO₂e' },
 ];
 
-const dailySeries30Days = [
-  { date: '24/09/2026', label: '24/09', count: 4 },
-  { date: '25/09/2026', label: '25/09', count: 5 },
-  { date: '26/09/2026', label: '26/09', count: 3 },
-  { date: '27/09/2026', label: '27/09', count: 7 },
-  { date: '28/09/2026', label: '28/09', count: 8 },
-  { date: '29/09/2026', label: '29/09', count: 5 },
-  { date: '30/09/2026', label: '30/09', count: 9 },
-  { date: '01/10/2026', label: '01/10', count: 10 },
-  { date: '02/10/2026', label: '02/10', count: 6 },
-  { date: '03/10/2026', label: '03/10', count: 7 },
-  { date: '04/10/2026', label: '04/10', count: 9 },
-  { date: '05/10/2026', label: '05/10', count: 8 },
-  { date: '06/10/2026', label: '06/10', count: 5 },
-  { date: '07/10/2026', label: '07/10', count: 4 },
-  { date: '08/10/2026', label: '08/10', count: 3 },
-  { date: '09/10/2026', label: '09/10', count: 6 },
-  { date: '10/10/2026', label: '10/10', count: 7 },
-  { date: '11/10/2026', label: '11/10', count: 6 },
-  { date: '12/10/2026', label: '12/10', count: 8 },
-  { date: '13/10/2026', label: '13/10', count: 7 },
-  { date: '14/10/2026', label: '14/10', count: 9 },
-  { date: '15/10/2026', label: '15/10', count: 8 },
-  { date: '16/10/2026', label: '16/10', count: 6 },
-  { date: '17/10/2026 (Hoje)', label: 'Hoje', count: 7 },
-];
-
-function mapHistoryRowToModalData(row: HistoryEventRow, fallbackIndex: number): ModalServiceData {
-  const numericId = Number(row.sub.replace(/\D/g, '')) || fallbackIndex + 1;
-  const normalizedStatus: ModalServiceData['status'] =
-    row.status === 'Ativo'
-      ? 'ativo'
-      : row.status === 'Indisponível' || row.status === 'Removido'
-      ? 'indisponível'
-      : 'sem_metricas';
-
-  return {
-    id: numericId,
-    name: row.id,
-    status: normalizedStatus,
-    location: row.loc || 'Localização não informada',
-  };
+function MetricasColeta({ coleta }: { coleta: ColetaMetrica }) {
+  return (
+    <dl className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+      {METRICAS.map(({ label, field, unit }) => (
+        <div key={field} className="min-w-0 rounded-lg bg-[#07150E] px-3 py-2">
+          <dt className="text-[11px] text-[#9DB0A4]">{label}</dt>
+          <dd className="break-words text-xs font-medium text-[#F2FAF5]">
+            {formatMetric(coleta[field], unit)}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
 }
 
-export const HistoricoPage: React.FC = () => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
-  const [chartWindow, setChartWindow] = useState<'30d' | '7d'>('30d');
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const [selectedServiceModal, setSelectedServiceModal] = useState<ModalServiceData | null>(null);
+export const HistoricoPage = () => {
+  const [periodoInicial] = useState(() => {
+    const fim = new Date();
+    const inicio = new Date(fim);
+    inicio.setDate(inicio.getDate() - 29);
+    return {
+      dataInicio: formatDateInput(inicio),
+      dataFim: formatDateInput(fim),
+      inicio: new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate()).getTime(),
+      fim: new Date(fim.getFullYear(), fim.getMonth(), fim.getDate(), 23, 59, 59, 999).getTime(),
+    };
+  });
+  const [coletas, setColetas] = useState<ColetaMetrica[]>([]);
+  const [servidorId, setServidorId] = useState('');
+  const [busca, setBusca] = useState('');
+  const [dataInicio, setDataInicio] = useState(periodoInicial.dataInicio);
+  const [dataFim, setDataFim] = useState(periodoInicial.dataFim);
+  const [filtrosAplicados, setFiltrosAplicados] = useState<FiltrosAplicados>({
+    servidorId: '',
+    busca: '',
+    inicio: periodoInicial.inicio,
+    fim: periodoInicial.fim,
+  });
+  const [ordem, setOrdem] = useState<'desc' | 'asc'>('desc');
+  const [pagina, setPagina] = useState(1);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
+  const [erroPeriodo, setErroPeriodo] = useState<string | null>(null);
+  const [atualizadoEm, setAtualizadoEm] = useState<Date | null>(null);
+  const [servicosConhecidos, setServicosConhecidos] = useState<string[]>([]);
+  const requestRef = useRef<AbortController | null>(null);
 
-  const [refreshIntervalSec] = useState<number>(5);
-  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date>(() => new Date());
+  const carregarHistorico = useCallback(async (filtroServidorId: string) => {
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
+    setCarregando(true);
+    setErro(null);
 
-  const formatDateTime = (date: Date) => {
-    return date
-      .toLocaleString('pt-BR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-      .replace(',', '');
-  };
+    try {
+      const url = new URL(HISTORICO_URL);
+      url.searchParams.set('limite', String(LIMITE_HISTORICO));
+      if (filtroServidorId) url.searchParams.set('servidorId', filtroServidorId);
+
+      const response = await fetch(url.toString(), { signal: controller.signal });
+      if (!response.ok) {
+        throw new Error(`A API respondeu com erro HTTP ${response.status}.`);
+      }
+
+      const payload: unknown = await response.json();
+      if (!Array.isArray(payload)) {
+        throw new Error('A resposta da API não está no formato esperado para o histórico.');
+      }
+      const registros = payload.filter(isColetaMetrica);
+      if (registros.length !== payload.length) {
+        throw new Error('A resposta da API contém coletas com formato inválido.');
+      }
+      if (controller.signal.aborted) return;
+
+      setColetas(registros);
+      setServicosConhecidos((atuais) =>
+        [...new Set([...atuais, ...registros.map((registro) => registro.servidorId)])]
+          .sort((a, b) => a.localeCompare(b)),
+      );
+      setAtualizadoEm(new Date());
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'AbortError') return;
+      setErro(error instanceof Error ? error.message : 'Ocorreu um erro desconhecido ao consultar o histórico.');
+    } finally {
+      if (requestRef.current === controller) {
+        requestRef.current = null;
+        setCarregando(false);
+      }
+    }
+  }, []);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setLastUpdatedAt(new Date());
-    }, refreshIntervalSec * 1000);
+    let ativo = true;
+    void Promise.resolve().then(() => {
+      if (ativo) void carregarHistorico('');
+    });
+    return () => {
+      ativo = false;
+      requestRef.current?.abort();
+    };
+  }, [carregarHistorico]);
 
-    return () => clearInterval(timer);
-  }, [refreshIntervalSec]);
+  const coletasFiltradas = useMemo(() => {
+    const termo = filtrosAplicados.busca.toLocaleLowerCase('pt-BR');
+    return coletas
+      .filter((coleta) => {
+        const instante = Date.parse(coleta.coletadoEm);
+        const correspondePeriodo = instante >= filtrosAplicados.inicio && instante <= filtrosAplicados.fim;
+        const correspondeServico =
+          !filtrosAplicados.servidorId || coleta.servidorId === filtrosAplicados.servidorId;
+        const correspondeBusca = !termo || coleta.servidorId.toLocaleLowerCase('pt-BR').includes(termo);
+        return correspondePeriodo && correspondeServico && correspondeBusca;
+      })
+      .sort((a, b) =>
+        ordem === 'desc'
+          ? Date.parse(b.coletadoEm) - Date.parse(a.coletadoEm)
+          : Date.parse(a.coletadoEm) - Date.parse(b.coletadoEm),
+      );
+  }, [coletas, filtrosAplicados, ordem]);
 
-  const toggleStatusFilter = (status: string) => {
-    setStatusFilter((prev) => (prev === status ? null : status));
+  const totalPaginas = Math.max(1, Math.ceil(coletasFiltradas.length / ITENS_POR_PAGINA));
+  const paginaAtual = Math.min(pagina, totalPaginas);
+  const coletasVisiveis = coletasFiltradas.slice(
+    (paginaAtual - 1) * ITENS_POR_PAGINA,
+    paginaAtual * ITENS_POR_PAGINA,
+  );
+
+  const enviarFiltros = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const inicio = parseDateInput(dataInicio);
+    const fim = parseDateInput(dataFim);
+    if (!inicio || !fim) {
+      setErroPeriodo('Informe datas válidas para o período.');
+      return;
+    }
+    if (inicio.getTime() > fim.getTime()) {
+      setErroPeriodo('A data inicial não pode ser posterior à data final.');
+      return;
+    }
+
+    setErroPeriodo(null);
+    setPagina(1);
+    setFiltrosAplicados({
+      servidorId,
+      busca: busca.trim(),
+      inicio: inicio.getTime(),
+      fim: fim.getTime() + 24 * 60 * 60 * 1000 - 1,
+    });
+    void carregarHistorico(servidorId);
   };
 
-  const filteredRows = useMemo(() => {
-    const term = searchTerm.toLowerCase().trim();
-    const filtered = historyData.filter((row) => {
-      const matchesSearch =
-        !term ||
-        row.id.toLowerCase().includes(term) ||
-        row.sub.toLowerCase().includes(term) ||
-        row.loc.toLowerCase().includes(term) ||
-        row.event.toLowerCase().includes(term);
-      const matchesStatus = statusFilter ? row.status === statusFilter : true;
-      return matchesSearch && matchesStatus;
-    });
+  const contagemStatus = (status: string) =>
+    coletasFiltradas.filter((coleta) => getStatusLabel(coleta.status) === status).length;
 
-    return [...filtered].sort((a, b) =>
-      sortOrder === 'desc' ? b.timestamp - a.timestamp : a.timestamp - b.timestamp
-    );
-  }, [searchTerm, statusFilter, sortOrder]);
-
-  const visibleBars = chartWindow === '30d' ? dailySeries30Days : dailySeries30Days.slice(-7);
+  const atualizarHorario = atualizadoEm
+    ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'medium' }).format(atualizadoEm)
+    : null;
 
   return (
-    <div className="min-h-screen bg-[#060D09] text-white p-4 sm:p-6 md:p-8 font-sans pb-24 md:pb-20">
-      {/* Cabeçalho */}
-      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4 mb-6 sm:mb-7">
+    <div className="min-h-full bg-[#07150E] p-4 pb-24 font-sans text-[#F2FAF5] sm:p-6 md:p-8">
+      <header className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold mb-1">Histórico</h1>
-          <h2 className="text-base sm:text-xl font-semibold mb-1.5">Verifique resultados e análises passadas</h2>
-          <p className="text-gray-400 text-xs sm:text-sm">
-            Última atualização: <span className="text-gray-200">{formatDateTime(lastUpdatedAt)}</span> · atualiza a cada{' '}
-            {refreshIntervalSec} s
+          <h1 className="text-2xl font-bold sm:text-3xl">Histórico de coletas</h1>
+          <p className="mt-1 text-sm text-[#9DB0A4]">
+            Consulte as medições salvas por serviço e período.
           </p>
         </div>
+        {atualizarHorario && (
+          <p className="text-xs text-[#9DB0A4]">Última consulta: {atualizarHorario}</p>
+        )}
+      </header>
 
-        <div className="relative w-full lg:w-80">
-          <svg className="w-4 h-4 sm:w-5 sm:h-5 absolute left-3 top-2.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Pesquise por um serviço aqui"
-            className="bg-[#0B150F] border border-[#1A2E20] rounded-lg pl-9 sm:pl-10 pr-4 py-2 w-full text-xs sm:text-sm focus:outline-none focus:border-[#2FA862] text-white placeholder-gray-500"
-          />
-        </div>
-      </div>
-
-      {/* Cards de KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
-        {[
-          { title: 'Registros no período', value: '128', sub: '▲ 12% vs. período anterior', filterValue: null },
-          { title: 'Serviços ativos', value: '94', sub: '73% do total', filterValue: 'Ativo' },
-          { title: 'Indisponíveis', value: '21', sub: '▲ 3 novos hoje', filterValue: 'Indisponível' },
-          { title: 'Sem métricas', value: '13', sub: '10% do total', filterValue: 'Sem métricas' },
-        ].map((kpi, i) => {
-          const isSelected = kpi.filterValue !== null && statusFilter === kpi.filterValue;
-          return (
-            <button
-              key={i}
-              type="button"
-              onClick={() => (kpi.filterValue ? toggleStatusFilter(kpi.filterValue) : setStatusFilter(null))}
-              className={`text-left bg-[#0C1711] border p-4 sm:p-5 rounded-xl transition-colors cursor-pointer ${
-                isSelected ? 'border-[#2FA862] bg-[#112419]' : 'border-[#1A2E20] hover:border-[#2FA862]/60'
-              }`}
-            >
-              <h4 className="text-gray-400 text-xs sm:text-sm mb-2">{kpi.title}</h4>
-              <div className="text-2xl sm:text-3xl font-bold mb-2">{kpi.value}</div>
-              <div className="text-[11px] sm:text-xs text-gray-400">{kpi.sub}</div>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Gráficos */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-7">
-        {/* Gráfico de Barras: Eventos ao longo do tempo */}
-        <div className="lg:col-span-2 bg-[#0C1711] border border-[#1A2E20] p-4 sm:p-6 rounded-xl flex flex-col justify-between">
-          <div>
-            <h4 className="font-bold text-base sm:text-lg">Eventos ao longo do tempo</h4>
-            <p className="text-gray-400 text-xs mt-0.5 mb-8">
-              Quantidade de registros por dia{' '}
-              <button
-                type="button"
-                onClick={() => setChartWindow((prev) => (prev === '30d' ? '7d' : '30d'))}
-                title="Alternar janela temporal"
-                className="underline text-gray-300 hover:text-[#4ADE80] cursor-pointer"
-              >
-                {chartWindow === '30d' ? 'últimos 30 dias' : 'últimos 7 dias'}
-              </button>
-            </p>
-          </div>
-
-          <div>
-            <div className="h-36 sm:h-44 flex items-end justify-between gap-1.5 mt-2">
-              {visibleBars.map((item, i) => {
-                const isNearLeft = i <= 1;
-                const isNearRight = i >= visibleBars.length - 2;
-                const tooltipPositionClass = isNearLeft
-                  ? 'left-0'
-                  : isNearRight
-                  ? 'right-0'
-                  : 'left-1/2 -translate-x-1/2';
-                const arrowPositionClass = isNearLeft
-                  ? 'left-3'
-                  : isNearRight
-                  ? 'right-3'
-                  : 'left-1/2 -translate-x-1/2';
-
-                return (
-                  <div
-                    key={item.date}
-                    tabIndex={0}
-                    aria-label={`${item.date}: ${item.count} ${item.count === 1 ? 'registro' : 'registros'}`}
-                    className="group relative flex-1 h-full flex items-end focus:outline-none cursor-pointer"
-                  >
-                    {/* Barra */}
-                    <div
-                      className="w-full bg-[#1B5E36] group-hover:bg-[#2FA862] group-focus:bg-[#2FA862] rounded-t-sm transition-colors"
-                      style={{ height: `${item.count * 10}%` }}
-                    />
-
-                    {/* Balão flutuante acima do topo exato da coluna */}
-                    <div
-                      style={{ bottom: `calc(${item.count * 10}% + 8px)` }}
-                      className={`pointer-events-none opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 group-focus:opacity-100 group-focus:scale-100 transition-all duration-150 absolute ${tooltipPositionClass} z-20 bg-[#08150E] border border-[#2FA862] text-white rounded-lg px-2.5 py-1.5 shadow-[0_8px_20px_rgba(0,0,0,0.85)] whitespace-nowrap`}
-                    >
-                      <div className="text-[10px] text-gray-300 leading-tight">{item.date}</div>
-                      <div className="text-xs font-bold text-[#4ADE80] leading-tight mt-0.5">
-                        {item.count} {item.count === 1 ? 'registro' : 'registros'}
-                      </div>
-
-                      {/* Setinha inferior do balão */}
-                      <span
-                        className={`absolute -bottom-[5px] ${arrowPositionClass} w-2 h-2 rotate-45 bg-[#08150E] border-r border-b border-[#2FA862]`}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="flex justify-between text-xs text-gray-400 mt-2.5">
-              <span>{chartWindow === '30d' ? 'há 30 dias' : 'há 7 dias'}</span>
-              <span>hoje</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Gráfico Donut: Distribuição por status */}
-        <div className="lg:col-span-1 bg-[#0C1711] border border-[#1A2E20] p-4 sm:p-6 rounded-xl flex flex-col justify-between">
-          <div>
-            <h4 className="font-bold text-base sm:text-lg flex items-center gap-2">
-              <span>Distribuição por status</span>
-              <span
-                title="Proporção dos registros históricos agrupados pelo status do serviço"
-                className="inline-flex items-center text-gray-400 hover:text-gray-200 cursor-help"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </span>
-            </h4>
-            <p className="text-gray-400 text-xs mt-0.5 mb-5">Proporção dos registros no período</p>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 my-auto">
-            <div className="relative w-32 h-32 shrink-0">
-              <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
-                <circle cx="18" cy="18" r="14.5" fill="transparent" stroke="#1A2E20" strokeWidth="5.5" />
-                <circle
-                  cx="18"
-                  cy="18"
-                  r="14.5"
-                  fill="transparent"
-                  stroke="#2FA862"
-                  strokeWidth="5.5"
-                  strokeDasharray="66.5 91.1"
-                  strokeDashoffset="0"
-                />
-                <circle
-                  cx="18"
-                  cy="18"
-                  r="14.5"
-                  fill="transparent"
-                  stroke="#EF4444"
-                  strokeWidth="5.5"
-                  strokeDasharray="14.6 91.1"
-                  strokeDashoffset="-66.5"
-                />
-                <circle
-                  cx="18"
-                  cy="18"
-                  r="14.5"
-                  fill="transparent"
-                  stroke="#6B7280"
-                  strokeWidth="5.5"
-                  strokeDasharray="10 91.1"
-                  strokeDashoffset="-81.1"
-                />
-              </svg>
-            </div>
-
-            <div className="flex flex-col gap-2.5 w-full sm:w-auto">
-              {[
-                { status: 'Ativo', pct: '73%' },
-                { status: 'Indisponível', pct: '16%' },
-                { status: 'Sem métricas', pct: '11%' },
-              ].map((item) => (
-                <button
-                  key={item.status}
-                  type="button"
-                  onClick={() => toggleStatusFilter(item.status)}
-                  className={`flex items-center justify-between gap-2.5 px-2 py-1 rounded-lg transition-colors cursor-pointer ${
-                    statusFilter === item.status ? 'bg-[#1A2E20] ring-1 ring-[#2FA862]' : 'hover:bg-[#111F16]'
-                  }`}
-                >
-                  <StatusBadge status={item.status} size="sm" />
-                  <span className="font-bold text-sm text-gray-200">{item.pct}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Histórico de Registros */}
-      <div className="bg-[#0C1711] border border-[#1A2E20] p-4 sm:p-6 rounded-xl">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-5">
-          <div>
-            <h4 className="font-bold text-base sm:text-lg text-white">Histórico de registros</h4>
-            <p className="text-gray-400 text-xs mt-0.5">
-              {sortOrder === 'desc' ? 'Mais recentes primeiro' : 'Mais antigos primeiro'}, clique em uma linha para abrir o serviço
-            </p>
-          </div>
-          <div className="flex items-center justify-between sm:justify-end gap-3">
-            {statusFilter && (
-              <button
-                type="button"
-                onClick={() => setStatusFilter(null)}
-                className="text-xs text-[#4ADE80] underline hover:text-white transition cursor-pointer"
-              >
-                Limpar filtro ({statusFilter})
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'))}
-              className="w-full sm:w-auto justify-between sm:justify-center bg-[#1E663B] hover:bg-[#154D2B] text-white border border-[#2FA862] px-4 py-2 rounded-md text-xs sm:text-sm font-medium flex items-center gap-2 transition cursor-pointer"
-            >
-              <span>Ordenar: Data</span>
-              <svg
-                className={`w-4 h-4 transition-transform ${sortOrder === 'asc' ? 'rotate-180' : ''}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* =========================================================
-            MOBILE (< 768px): Cards de histórico
-            ========================================================= */}
-        <div className="md:hidden space-y-3">
-          {filteredRows.map((row, i) => (
-            <div
-              key={`${row.id}-${row.date}`}
-              onClick={() => setSelectedServiceModal(mapHistoryRowToModalData(row, i))}
-              className="p-3.5 rounded-xl bg-[#09120D] border border-[#1A2E20] hover:border-[#2FA862] transition-colors cursor-pointer"
-            >
-              <div className="flex items-start justify-between gap-2 mb-2.5">
-                <div>
-                  <div className="font-semibold text-sm text-white">{row.id}</div>
-                  <div className="text-[11px] text-gray-400">{row.sub}</div>
-                </div>
-                <StatusBadge status={row.status} size="sm" />
-              </div>
-
-              <div className="space-y-1.5 text-xs">
-                <div className="flex items-center justify-between py-1 border-b border-[#1A2E20]/80">
-                  <span className="text-gray-400">Localização</span>
-                  <span className="text-gray-200 font-medium">{row.loc || 'Não informada'}</span>
-                </div>
-                <div className="flex items-center justify-between py-1 border-b border-[#1A2E20]/80">
-                  <span className="text-gray-400">Data e hora</span>
-                  <span className="text-gray-200">{row.date}</span>
-                </div>
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-gray-400">Evento</span>
-                  <span className="text-gray-200 font-medium">{row.event}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* =========================================================
-            DESKTOP (>= 768px): Tabela completa conforme protótipo
-            ========================================================= */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-left text-sm whitespace-nowrap border-collapse">
-            <thead>
-              <tr className="bg-[#9BAE9E] text-[#0C1711] text-xs font-semibold">
-                <th className="py-2.5 px-4 rounded-l-md w-1/5">Serviço</th>
-                <th className="py-2.5 px-4 w-1/5">Localização</th>
-                <th className="py-2.5 px-4 w-1/5">Data e hora</th>
-                <th className="py-2.5 px-4 w-1/5">Evento</th>
-                <th className="py-2.5 px-4 w-1/6">
-                  <div className="flex items-center gap-1.5">
-                    <span>Status</span>
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                </th>
-                <th className="py-2.5 px-4 rounded-r-md"></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="h-2"></tr>
-
-              {filteredRows.map((row, i) => (
-                <tr
-                  key={`${row.id}-${row.date}`}
-                  onClick={() => setSelectedServiceModal(mapHistoryRowToModalData(row, i))}
-                  className="border-b border-[#1A2E20] hover:bg-[#111F16] transition-colors cursor-pointer group"
-                >
-                  <td className="py-3.5 px-4 rounded-l-md">
-                    <div className="font-semibold text-white">{row.id}</div>
-                    <div className="text-xs text-gray-500">{row.sub}</div>
-                  </td>
-                  <td className="py-3.5 px-4 text-gray-300">{row.loc || 'Não informada'}</td>
-                  <td className="py-3.5 px-4 text-gray-300">{row.date}</td>
-                  <td className="py-3.5 px-4 text-gray-300">{row.event}</td>
-                  <td className="py-3.5 px-4">
-                    <StatusBadge status={row.status} size="sm" />
-                  </td>
-                  <td className="py-3.5 px-4 text-right rounded-r-md">
-                    <svg
-                      className="w-4 h-4 text-white inline-block group-hover:translate-x-0.5 transition-transform"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Rodapé da tabela com paginação */}
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mt-6 text-xs text-gray-400">
-          <span>Mostrando 1–{filteredRows.length} de 128 registros</span>
-          <div className="flex gap-1.5">
-            <button
-              type="button"
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              className="w-7 h-7 flex items-center justify-center border border-[#1A2E20] rounded hover:bg-[#1A2E20] transition cursor-pointer"
-            >
-              &lt;
-            </button>
-            {[1, 2, 3].map((page) => (
-              <button
-                key={page}
-                type="button"
-                onClick={() => setCurrentPage(page)}
-                className={`w-7 h-7 flex items-center justify-center rounded transition cursor-pointer ${
-                  currentPage === page
-                    ? 'bg-[#1E663B] text-white border border-[#2FA862] font-medium'
-                    : 'border border-[#1A2E20] hover:bg-[#1A2E20]'
-                }`}
-              >
-                {page}
-              </button>
+      <form
+        onSubmit={enviarFiltros}
+        className="mb-6 grid grid-cols-1 gap-4 rounded-2xl border-2 border-[#385E47] bg-[#0D2115] p-4 sm:grid-cols-2 lg:grid-cols-5 sm:p-5"
+      >
+        <label className="flex flex-col gap-1.5 text-xs font-medium text-[#D4E3DA]">
+          Serviço
+          <select
+            aria-label="Serviço"
+            value={servidorId}
+            onChange={(event) => setServidorId(event.target.value)}
+            className="min-h-11 rounded-lg border border-[#4A6B57] bg-[#07150E] px-3 text-sm text-[#F2FAF5] focus:border-[#14C45A] focus:outline-none"
+          >
+            <option value="">Todos os serviços</option>
+            {servicosConhecidos.map((id) => (
+              <option key={id} value={id}>{id}</option>
             ))}
-            <span className="w-7 h-7 flex items-center justify-center border border-[#1A2E20] rounded text-gray-500">
-              ...
-            </span>
-            <button
-              type="button"
-              onClick={() => setCurrentPage(22)}
-              className={`w-7 h-7 flex items-center justify-center rounded transition cursor-pointer ${
-                currentPage === 22
-                  ? 'bg-[#1E663B] text-white border border-[#2FA862] font-medium'
-                  : 'border border-[#1A2E20] hover:bg-[#1A2E20]'
-              }`}
-            >
-              22
-            </button>
-            <button
-              type="button"
-              onClick={() => setCurrentPage((p) => Math.min(22, p + 1))}
-              className="w-7 h-7 flex items-center justify-center border border-[#1A2E20] rounded hover:bg-[#1A2E20] transition cursor-pointer"
-            >
-              &gt;
-            </button>
-          </div>
-        </div>
-      </div>
+          </select>
+        </label>
 
-      {/* Modal de detalhes do serviço ao clicar em uma linha do histórico */}
-      {selectedServiceModal && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Detalhes de ${selectedServiceModal.name}`}
-          onClick={() => setSelectedServiceModal(null)}
-          className="fixed inset-0 z-[1050] bg-black/65 backdrop-blur-xs flex items-center justify-center p-4"
-        >
-          <div onClick={(e) => e.stopPropagation()} className="flex flex-col items-end gap-2">
-            <button
-              type="button"
-              onClick={() => setSelectedServiceModal(null)}
-              aria-label="Fechar detalhes do serviço"
-              className="px-3 py-1 rounded-full bg-[#081C12] border border-[#F2FAF5]/50 text-[#F2FAF5] text-xs hover:bg-[#1F8A4C] transition-colors cursor-pointer"
-            >
-              Fechar ✕
-            </button>
-            <ServiceModal service={selectedServiceModal} />
-          </div>
+        <label className="flex flex-col gap-1.5 text-xs font-medium text-[#D4E3DA]">
+          Buscar serviço
+          <input
+            type="search"
+            value={busca}
+            onChange={(event) => setBusca(event.target.value)}
+            placeholder="Digite o ID do serviço"
+            className="min-h-11 rounded-lg border border-[#4A6B57] bg-[#07150E] px-3 text-sm text-[#F2FAF5] placeholder-[#9DB0A4] focus:border-[#14C45A] focus:outline-none"
+          />
+        </label>
+
+        <label className="flex flex-col gap-1.5 text-xs font-medium text-[#D4E3DA]">
+          Data inicial
+          <input
+            aria-label="Data inicial"
+            type="date"
+            value={dataInicio}
+            onChange={(event) => setDataInicio(event.target.value)}
+            className="min-h-11 rounded-lg border border-[#4A6B57] bg-[#07150E] px-3 text-sm text-[#F2FAF5] focus:border-[#14C45A] focus:outline-none"
+          />
+        </label>
+
+        <label className="flex flex-col gap-1.5 text-xs font-medium text-[#D4E3DA]">
+          Data final
+          <input
+            aria-label="Data final"
+            type="date"
+            value={dataFim}
+            onChange={(event) => setDataFim(event.target.value)}
+            className="min-h-11 rounded-lg border border-[#4A6B57] bg-[#07150E] px-3 text-sm text-[#F2FAF5] focus:border-[#14C45A] focus:outline-none"
+          />
+        </label>
+
+        <div className="flex items-end">
+          <button
+            type="submit"
+            disabled={carregando}
+            className="min-h-11 w-full rounded-lg border-2 border-[#14C45A] bg-[#1F8A4C] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#2FA862] disabled:cursor-wait disabled:opacity-60"
+          >
+            {carregando ? 'Carregando...' : 'Aplicar filtros'}
+          </button>
         </div>
+        {erroPeriodo && (
+          <p role="alert" className="text-sm text-[#FFD1C2] sm:col-span-2 lg:col-span-5">
+            {erroPeriodo}
+          </p>
+        )}
+      </form>
+
+      {erro && (
+        <div role="alert" className="mb-5 flex flex-col gap-3 rounded-xl border border-red-500/60 bg-red-950/40 p-4 text-sm text-red-100 sm:flex-row sm:items-center sm:justify-between">
+          <span>Não foi possível carregar o histórico: {erro}</span>
+          <button
+            type="button"
+            onClick={() => void carregarHistorico(filtrosAplicados?.servidorId ?? '')}
+            disabled={carregando}
+            className="self-start rounded-lg border border-red-300/70 px-3 py-2 font-semibold hover:bg-red-900/50 disabled:opacity-60 sm:self-auto"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      )}
+
+      {filtrosAplicados && (
+        <>
+          <section aria-label="Resumo das coletas no período" className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {[
+              { label: 'Coletas no período', value: coletasFiltradas.length },
+              { label: 'Disponíveis', value: contagemStatus('Disponível') },
+              { label: 'Indisponíveis', value: contagemStatus('Indisponível') },
+              { label: 'Sem métricas', value: contagemStatus('Sem métricas') },
+            ].map((item) => (
+              <div key={item.label} className="rounded-xl border-2 border-[#385E47] bg-[#0D2115] p-4">
+                <p className="text-xs text-[#9DB0A4]">{item.label}</p>
+                <p className="mt-1 text-2xl font-bold tabular-nums">{item.value}</p>
+              </div>
+            ))}
+          </section>
+
+          <section className="rounded-2xl border-2 border-[#385E47] bg-[#0D2115] p-4 sm:p-6">
+            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-lg font-bold sm:text-xl">Medições registradas</h2>
+                <p className="mt-1 text-xs text-[#9DB0A4]">
+                  {ordem === 'desc' ? 'Mais recentes primeiro' : 'Mais antigas primeiro'} · {coletasFiltradas.length} registros
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPagina(1);
+                  setOrdem((atual) => (atual === 'desc' ? 'asc' : 'desc'));
+                }}
+                className="min-h-10 rounded-lg border border-[#4A6B57] bg-[#07150E] px-3 text-sm hover:border-[#14C45A]"
+              >
+                Ordenar: {ordem === 'desc' ? 'mais recentes' : 'mais antigas'}
+              </button>
+            </div>
+
+            {carregando && (
+              <p role="status" aria-live="polite" className="rounded-lg bg-[#07150E] p-5 text-center text-sm text-[#D4E3DA]">
+                Carregando coletas salvas...
+              </p>
+            )}
+
+            {!carregando && !erro && coletasFiltradas.length === 0 && (
+              <div className="rounded-xl border border-dashed border-[#4A6B57] bg-[#09180F] px-4 py-10 text-center">
+                <p className="font-semibold">Nenhuma coleta encontrada neste período.</p>
+                <p className="mt-1 text-sm text-[#9DB0A4]">
+                  Verifique o serviço selecionado e as datas informadas.
+                </p>
+              </div>
+            )}
+
+            {!carregando && !erro && coletasFiltradas.length > 0 && (
+              <>
+                <div className="space-y-3 md:hidden">
+                  {coletasVisiveis.map((coleta) => (
+                    <article key={coleta.id} className="space-y-3 rounded-xl border border-[#385E47] bg-[#09180F] p-3">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <h3 className="font-semibold">{coleta.servidorId}</h3>
+                          <p className="text-xs text-[#9DB0A4]">{formatDateTime(coleta.coletadoEm)}</p>
+                        </div>
+                        <span className={`rounded-lg border px-2.5 py-1 text-xs font-semibold ${getStatusClass(coleta.status)}`}>
+                          {getStatusLabel(coleta.status)}
+                        </span>
+                      </div>
+                      <MetricasColeta coleta={coleta} />
+                      <p className="text-xs text-[#9DB0A4]">
+                        Região: {coleta.codigoRegiao ?? 'Não informada'}
+                        {coleta.intervaloSegundos !== null && ` · Intervalo: ${coleta.intervaloSegundos} s`}
+                      </p>
+                    </article>
+                  ))}
+                </div>
+
+                <div className="hidden overflow-x-auto md:block">
+                  <table className="w-full min-w-[1050px] border-collapse text-left text-sm">
+                    <thead>
+                      <tr className="bg-[#96AA9E] text-xs font-semibold text-[#07150E]">
+                        <th className="rounded-l-lg px-3 py-3">Serviço · data e hora</th>
+                        <th className="px-3 py-3">Status</th>
+                        {METRICAS.map(({ label, unit, field }) => (
+                          <th key={field} className="px-3 py-3">{label} ({unit})</th>
+                        ))}
+                        <th className="rounded-r-lg px-3 py-3">Indicadores</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {coletasVisiveis.map((coleta) => (
+                        <tr key={coleta.id} className="border-b border-[#243F2F] align-top">
+                          <td className="px-3 py-3">
+                            <div className="font-semibold">{coleta.servidorId}</div>
+                            <time className="text-xs text-[#9DB0A4]" dateTime={coleta.coletadoEm}>
+                              {formatDateTime(coleta.coletadoEm)}
+                            </time>
+                          </td>
+                          <td className="px-3 py-3">
+                            <span className={`whitespace-nowrap rounded-lg border px-2 py-1 text-xs font-semibold ${getStatusClass(coleta.status)}`}>
+                              {getStatusLabel(coleta.status)}
+                            </span>
+                          </td>
+                          {METRICAS.map(({ field, unit }) => (
+                            <td key={field} className="whitespace-nowrap px-3 py-3 text-[#D4E3DA]">
+                              {formatMetric(coleta[field], unit)}
+                            </td>
+                          ))}
+                          <td className="px-3 py-3 text-xs text-[#D4E3DA]">
+                            <div>Região: {coleta.codigoRegiao ?? 'Não informada'}</div>
+                            <div>Intervalo: {coleta.intervaloSegundos === null ? 'Não informado' : `${coleta.intervaloSegundos} s`}</div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <footer className="mt-5 flex flex-col items-center justify-between gap-3 text-xs text-[#9DB0A4] sm:flex-row">
+                  <span>
+                    Mostrando {(paginaAtual - 1) * ITENS_POR_PAGINA + 1}–{Math.min(paginaAtual * ITENS_POR_PAGINA, coletasFiltradas.length)} de {coletasFiltradas.length} coletas
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      aria-label="Página anterior"
+                      onClick={() => setPagina((atual) => Math.max(1, atual - 1))}
+                      disabled={paginaAtual === 1}
+                      className="min-h-10 rounded-lg border border-[#4A6B57] px-3 disabled:opacity-40"
+                    >
+                      Anterior
+                    </button>
+                    <span aria-live="polite">Página {paginaAtual} de {totalPaginas}</span>
+                    <button
+                      type="button"
+                      aria-label="Próxima página"
+                      onClick={() => setPagina((atual) => Math.min(totalPaginas, atual + 1))}
+                      disabled={paginaAtual === totalPaginas}
+                      className="min-h-10 rounded-lg border border-[#4A6B57] px-3 disabled:opacity-40"
+                    >
+                      Próxima
+                    </button>
+                  </div>
+                </footer>
+              </>
+            )}
+          </section>
+        </>
       )}
     </div>
   );

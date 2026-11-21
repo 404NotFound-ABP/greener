@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { ServiceModal, type ModalServiceData } from './ServiceModal';
 
 const fechar = vi.fn();
-vi.mock('react-leaflet', () => ({ useMap: () => ({ closePopup: fechar }) }));
 
 const servico = (status: ModalServiceData['status']): ModalServiceData => ({
   id: 1,
@@ -14,25 +13,42 @@ const servico = (status: ModalServiceData['status']): ModalServiceData => ({
 
 describe('modal de serviço', () => {
   it('mostra localização e permite fechar', () => {
-    render(<ServiceModal service={servico('ativo')} />);
+    render(<ServiceModal service={servico('ativo')} onClose={fechar} />);
 
     expect(screen.getByText('Servidor Centro')).toBeInTheDocument();
     expect(screen.getByText('Cidade: São Paulo')).toBeInTheDocument();
+    expect(screen.getByText('Métricas disponíveis')).toBeInTheDocument();
+    expect(screen.getByText('CPU')).toBeInTheDocument();
+    expect(screen.getByText('Armazenamento')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ver dashboard completo' })).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole('button')[0]);
     expect(fechar).toHaveBeenCalled();
   });
 
   it('distingue serviço indisponível e último valor conhecido', () => {
-    render(<ServiceModal service={servico('indisponível')} />);
+    render(
+      <ServiceModal
+        service={{
+          ...servico('indisponível'),
+          kwh: 12.5,
+          co2: 45,
+          lastUpdate: '12:00:00',
+        }}
+      />
+    );
 
-    expect(screen.getByText(/indisponível/i)).toBeInTheDocument();
-    expect(screen.getByText('Último valor conhecido')).toBeInTheDocument();
+    expect(screen.getAllByText(/indisponível/i).length).toBeGreaterThan(0);
+    expect(screen.getByText('Valores da última atualização')).toBeInTheDocument();
+    expect(screen.getByText('12,5 kWh')).toBeInTheDocument();
+    expect(screen.getByText('45 gCO₂e')).toBeInTheDocument();
+    expect(screen.getByText('Última atualização: 12:00:00')).toBeInTheDocument();
   });
 
   it('não apresenta métricas simuladas como reais quando não há dados', () => {
     render(<ServiceModal service={servico('sem_metricas')} />);
 
     expect(screen.getByText(/nenhuma métrica recebida/i)).toBeInTheDocument();
+    expect(screen.getByText('Este serviço ainda não envia dados')).toBeInTheDocument();
     expect(screen.queryByText(/100/)).not.toBeInTheDocument();
   });
 });

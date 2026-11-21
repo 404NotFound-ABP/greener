@@ -1,7 +1,8 @@
 node_modules
 dist
+dist-ssr
+coverage
 .git
-.gitignore
 .env
-README.md
-Dockerfile
+.env.*
+*.local

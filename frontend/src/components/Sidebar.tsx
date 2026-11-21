@@ -10,8 +10,8 @@ import {
   defaultServiceRepository,
   type ServiceRepository
 } from '../adapters/serviceAdapter';
-import { useServicesPolling } from '../hooks/useServicesPolling';
-import { extractValidCoordinates, formatServiceLocation } from './MapBackground';
+import { formatIntervalLabel, useServicesPolling } from '../hooks/useServicesPolling';
+import { extractValidCoordinates, formatServiceLocation } from './mapServiceUtils';
 
 export type MobileSheetView = 'filters' | 'list' | 'collapsed';
 
@@ -32,6 +32,8 @@ export interface SidebarProps {
   onFetchServices?: () => Promise<ServiceData[]>;
   pollingState?: ReturnType<typeof useServicesPolling>;
   onSelectService?: (service: ServiceData) => void;
+  hiddenServiceIds?: ReadonlySet<string>;
+  onToggleServiceMarker?: (service: ServiceData) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -45,7 +47,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   repository,
   onFetchServices,
   pollingState,
-  onSelectService
+  onSelectService,
+  hiddenServiceIds,
+  onToggleServiceMarker
 }) => {
   const [internalSheetView, setInternalSheetView] = useState<MobileSheetView>('filters');
   const currentSheetView = mobileSheetView ?? internalSheetView;
@@ -65,10 +69,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return defaultServiceRepository;
   }, [repository, onFetchServices]);
 
-  const internalPolling = useServicesPolling({ repository: resolvedRepository });
+  const internalPolling = useServicesPolling({
+    repository: resolvedRepository,
+    enabled: !pollingState
+  });
   const {
     services,
     lastUpdate,
+    pollingIntervalSeconds,
     isPaused,
     isRefreshing,
     hasError,
@@ -124,7 +132,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       : 'Atualização pausada'
     : isStale
     ? 'Dados antigos · reconectando...'
-    : 'Atualizando a cada 5s';
+    : `Atualizando a cada ${formatIntervalLabel(pollingIntervalSeconds)}`;
 
   const renderServiceItem = (service: ServiceData) => {
     const hasCoords = Boolean(extractValidCoordinates(service));
@@ -136,7 +144,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         onClick={() => onSelectService?.(service)}
         className={`self-stretch flex flex-col gap-1 ${onSelectService ? 'cursor-pointer' : ''}`}
       >
-        <ServiceCard service={service} />
+        <ServiceCard
+          service={service}
+          markerVisible={!hiddenServiceIds?.has(service.id)}
+          onToggleMarker={() => onToggleServiceMarker?.(service)}
+        />
 
         {/* Indicadores explícitos para localização incompleta (#96) ou ausência de coordenadas (#102) */}
         {(locationInfo.isIncomplete || !hasCoords) && (
@@ -629,7 +641,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </svg>
               </div>
               <span className="text-[#F7F7F5] text-[16px] font-normal leading-[24px] whitespace-nowrap">
-                Sem métrica
+                Sem métricas
               </span>
             </button>
           </div>

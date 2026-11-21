@@ -1,4 +1,4 @@
-export type ServiceStatus = 'Ativo' | 'Indisponível' | 'Sem métrica' | 'Sem métricas';
+export type ServiceStatus = 'Ativo' | 'Indisponível' | 'Sem métricas';
 
 export interface LocationData {
   pais?: string | null;
@@ -19,6 +19,7 @@ export interface ServiceData {
   nome: string;
   status: ServiceStatus;
   localizacao?: LocationData | null;
+  coords?: [number, number];
   valores: MetricsData;
   periodo?: string;
   estimado?: boolean;
