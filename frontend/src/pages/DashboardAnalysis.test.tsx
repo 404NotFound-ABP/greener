@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardPage } from './DashboardPage';
 
@@ -66,23 +66,27 @@ afterEach(() => {
 });
 
 describe('DashboardPage — ranking e comparação', () => {
-  it('mostra a comparação inicial com os serviços selecionados por padrão', () => {
+  it('mostra os serviços reais selecionados por padrão', async () => {
     // Arrange
     render(<DashboardPage />);
 
     // Assert
-    expect(screen.getByText('5 de 5 serviços')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('2 de 5 serviços')).toBeInTheDocument());
+    expect(screen.getByRole('checkbox', { name: 'Zeta API' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Alpha API' })).toBeChecked();
   });
 
-  it('permite remover um serviço da comparação', () => {
+  it('permite remover um serviço da comparação', async () => {
     // Arrange
     render(<DashboardPage />);
 
     // Act
-    fireEvent.click(screen.getByRole('button', { name: 'Remover ASTAH-ABC da demonstração' }));
+    const zeta = await screen.findByRole('checkbox', { name: 'Zeta API' });
+    await waitFor(() => expect(zeta).toBeChecked());
+    fireEvent.click(zeta);
 
     // Assert
-    expect(screen.getByText('4 de 5 serviços')).toBeInTheDocument();
+    expect(screen.getByText('1 de 5 serviços')).toBeInTheDocument();
   });
 
   it('ordena os serviços pelo critério escolhido no ranking', async () => {

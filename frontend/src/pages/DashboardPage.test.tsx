@@ -66,6 +66,13 @@ function stubDashboardApi(
       ? { resumo: dashboardSummary, servidores: dashboardServices }
       : url.endsWith('/servidores')
         ? dashboardServices.map(({ id, nome }) => ({ id, nome }))
+        : url.includes('/historico?')
+          ? {
+              pontos: [
+                { timestamp: new Date(Date.now() - 30 * 60_000).toISOString(), energia_kwh: 0.4 },
+                { timestamp: new Date(Date.now() - 10 * 60_000).toISOString(), energia_kwh: 0.7 },
+              ],
+            }
         : [];
     return Promise.resolve({
       ok: true,
@@ -99,10 +106,8 @@ describe('DashboardPage', () => {
     expect(screen.getByRole('article', { name: 'Serviços ativos' })).toHaveTextContent('1');
     expect(screen.getByRole('article', { name: 'Serviços indisponíveis' })).toHaveTextContent('1');
     expect(screen.getByText(/Período das coletas:/)).toHaveTextContent('janela de 1 mês (30d)');
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Totais parciais: métricas disponíveis para 2 de 3 serviços; 1 sem métricas.'
-    );
-    expect(screen.getByText(/demonstração simulada/)).toBeInTheDocument();
+    expect(screen.getByText('Totais parciais: métricas disponíveis para 2 de 3 serviços; 1 sem métricas.')).toBeInTheDocument();
+    expect(screen.getByText('Dados da API')).toBeInTheDocument();
     expect(buscar).toHaveBeenCalledWith(
       'http://localhost:3001/api/servidores/dashboard',
       expect.objectContaining({ signal: expect.any(AbortSignal) })
@@ -225,6 +230,38 @@ describe('DashboardPage', () => {
     const row = await screen.findByRole('row', { name: /Billing API/ });
     expect(row).toBeInTheDocument();
     expect(screen.getByRole('table')).not.toHaveTextContent('ASTAH-XYZ');
+  });
+
+  it('carrega históricos reais e permite selecionar serviços da API para o gráfico', async () => {
+    const additionalServices = Array.from({ length: 3 }, (_, index) => ({
+      ...services[2],
+      id: `extra-service-${index + 1}`,
+      nome: `Serviço extra ${index + 1}`,
+    }));
+    const buscar = stubDashboardApi(summary, [...services, ...additionalServices]);
+    render(<DashboardPage />);
+
+    const billing = await screen.findByRole('checkbox', { name: 'Billing API' });
+    const searchWorker = screen.getByRole('checkbox', { name: 'Search Worker' });
+    const extraService = screen.getByRole('checkbox', { name: 'Serviço extra 3' });
+    await waitFor(() => {
+      expect(billing).toBeChecked();
+      expect(searchWorker).toBeChecked();
+      expect(extraService).toBeDisabled();
+    });
+
+    await waitFor(() =>
+      expect(buscar).toHaveBeenCalledWith(
+        expect.stringMatching(/\/servidores\/billing-api\/historico\?limite=1000&janelaSegundos=3600/),
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      )
+    );
+    expect(await screen.findByRole('button', { name: /Billing API: 0\.4 kWh/ })).toBeInTheDocument();
+
+    fireEvent.click(billing);
+    fireEvent.click(extraService);
+    expect(billing).not.toBeChecked();
+    expect(extraService).toBeChecked();
   });
 
   it('informa quando a API retorna uma lista vazia', async () => {

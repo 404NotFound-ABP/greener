@@ -40,157 +40,24 @@ interface DashboardServiceRow {
   collectedAt: string | null;
 }
 
-interface DemoDashboardServiceRow {
-  numericId: number;
-  code: string;
-  subId: string;
-  location: string;
-  country: string;
-  region: string;
-  state: string;
-  city: string;
-  status: ServiceStatus;
-  consumptionKwh: number | null;
-  consumptionLabel: string;
-  emissionKg: number | null;
-  emissionLabel: string;
-  series: number[];
+interface DashboardChartPoint {
+  timestamp: number;
+  value: number;
+}
+
+interface DashboardChartService {
+  id: string;
+  name: string;
+  points: DashboardChartPoint[];
 }
 
 export interface DashboardPageProps {
   onOpenRanking?: () => void;
 }
 
-const SIMULATED_CHART_DATA: DemoDashboardServiceRow[] = [
-  {
-    numericId: 41,
-    code: 'ASTAH-XYZ',
-    subId: 'ID 0041',
-    location: 'São Francisco - EUA',
-    country: 'Estados Unidos',
-    region: 'América do Norte',
-    state: 'Califórnia',
-    city: 'São Francisco',
-    status: 'Ativo',
-    consumptionKwh: 1240,
-    consumptionLabel: '1.240',
-    emissionKg: 459,
-    emissionLabel: '459',
-    series: [35, 42, 43, 35, 36, 44, 42, 43, 43],
-  },
-  {
-    numericId: 102,
-    code: 'ASTAH-ABC',
-    subId: 'ID 0102',
-    location: 'São Paulo - BR',
-    country: 'Brasil',
-    region: 'Sudeste',
-    state: 'São Paulo',
-    city: 'São Paulo',
-    status: 'Ativo',
-    consumptionKwh: 1105,
-    consumptionLabel: '1.105',
-    emissionKg: 88,
-    emissionLabel: '88',
-    series: [32, 31, 30, 32, 35, 33, 34, 34, 34],
-  },
-  {
-    numericId: 87,
-    code: 'ASTAH-DEF',
-    subId: 'ID 0087',
-    location: 'Berlim - DE',
-    country: 'Alemanha',
-    region: 'Europa Central',
-    state: 'Berlim',
-    city: 'Berlim',
-    status: 'Ativo',
-    consumptionKwh: 962,
-    consumptionLabel: '962',
-    emissionKg: 366,
-    emissionLabel: '366',
-    series: [28, 25, 22, 27, 26, 23, 24, 23, 25],
-  },
-  {
-    numericId: 230,
-    code: 'ASTAH-GHI',
-    subId: 'ID 0230',
-    location: 'Sydney - AU',
-    country: 'Austrália',
-    region: 'Oceania',
-    state: 'Nova Gales do Sul',
-    city: 'Sydney',
-    status: 'Ativo',
-    consumptionKwh: 874,
-    consumptionLabel: '874',
-    emissionKg: 481,
-    emissionLabel: '481',
-    series: [19, 17, 17, 19, 18, 17, 17, 16, 17],
-  },
-  {
-    numericId: 315,
-    code: 'ASTAH-JKL',
-    subId: 'ID 0315',
-    location: 'Toronto - CA',
-    country: 'Canadá',
-    region: 'América do Norte',
-    state: 'Ontário',
-    city: 'Toronto',
-    status: 'Ativo',
-    consumptionKwh: 731,
-    consumptionLabel: '731',
-    emissionKg: 88,
-    emissionLabel: '88',
-    series: [12, 12, 11, 13, 12, 11, 10, 9, 10],
-  },
-  {
-    numericId: 412,
-    code: 'ASTAH-MNO',
-    subId: 'ID 0412',
-    location: 'Lisboa - PT',
-    country: 'Portugal',
-    region: 'Europa Ocidental',
-    state: 'Lisboa',
-    city: 'Lisboa',
-    status: 'Ativo',
-    consumptionKwh: 640,
-    consumptionLabel: '640',
-    emissionKg: 96,
-    emissionLabel: '96',
-    series: [21, 22, 20, 21, 23, 22, 21, 22, 22],
-  },
-  {
-    numericId: 455,
-    code: 'ASTAH-PQR',
-    subId: 'ID 0455',
-    location: 'Tóquio - JP',
-    country: 'Japão',
-    region: 'Ásia Oriental',
-    state: 'Tóquio',
-    city: 'Tóquio',
-    status: 'Indisponível',
-    consumptionKwh: 512,
-    consumptionLabel: '512 (último)',
-    emissionKg: 236,
-    emissionLabel: '236 (último)',
-    series: [15, 14, 15, 12, 8, 4, 2, 1, 0],
-  },
-  {
-    numericId: 501,
-    code: 'ASTAH-STU',
-    subId: 'ID 0501',
-    location: 'Cidade do México - MX',
-    country: 'México',
-    region: 'América do Norte',
-    state: 'Cidade do México',
-    city: 'Cidade do México',
-    status: 'Sem métricas',
-    consumptionKwh: null,
-    consumptionLabel: '-',
-    emissionKg: null,
-    emissionLabel: '-',
-    series: [0, 0, 0, 0, 0, 0, 0, 0, 0],
-  },
-];
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api').replace(/\/+$/, '');
+const CHART_WINDOW_SECONDS = 3600;
+const MAX_CHART_SERVICES = 5;
 
 function formatCollectionPeriod(summary: DashboardSummary): string {
   const formatter = new Intl.DateTimeFormat('pt-BR', {
@@ -412,6 +279,11 @@ const DashboardStatusPill: React.FC<{ status: ServiceStatus }> = ({ status }) =>
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({ onOpenRanking }) => {
   const [isComparingServices, setIsComparingServices] = useState(false);
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
+  const [chartHistory, setChartHistory] = useState<Record<string, DashboardChartPoint[]>>({});
+  const [isLoadingChartHistory, setIsLoadingChartHistory] = useState(false);
+  const [chartHistoryError, setChartHistoryError] = useState<string | null>(null);
+  const chartSelectionInitialized = useRef(false);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [countryFilter, setCountryFilter] = useState('');
@@ -421,14 +293,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onOpenRanking }) =
   const [openFilterMenu, setOpenFilterMenu] = useState<
     'country' | 'region' | 'status' | 'city' | null
   >(null);
-
-  const [selectedServiceCodes, setSelectedServiceCodes] = useState<string[]>([
-    'ASTAH-XYZ',
-    'ASTAH-ABC',
-    'ASTAH-DEF',
-    'ASTAH-GHI',
-    'ASTAH-JKL',
-  ]);
 
   const [sortMode, setSortMode] = useState<'alpha' | 'value'>('value');
   const [sortMetric, setSortMetric] = useState<'emission' | 'energy'>('energy');
@@ -503,6 +367,76 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onOpenRanking }) =
 
   const dashboardServices = useMemo(() => services.map(mapApiServiceToRow), [services]);
 
+  useEffect(() => {
+    const availableIds = new Set(dashboardServices.map(service => service.id));
+    if (!chartSelectionInitialized.current && dashboardServices.length > 0) {
+      chartSelectionInitialized.current = true;
+      setSelectedServiceIds(dashboardServices.slice(0, MAX_CHART_SERVICES).map(service => service.id));
+      return;
+    }
+    setSelectedServiceIds(previous => previous.filter(id => availableIds.has(id)));
+  }, [dashboardServices]);
+
+  useEffect(() => {
+    if (selectedServiceIds.length === 0) {
+      setChartHistory({});
+      setChartHistoryError(null);
+      setIsLoadingChartHistory(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    setIsLoadingChartHistory(true);
+    setChartHistoryError(null);
+
+    const loadHistory = async () => {
+      try {
+        const histories = await Promise.all(selectedServiceIds.map(async serviceId => {
+          const url = new URL(
+            `${API_BASE_URL}/servidores/${encodeURIComponent(serviceId)}/historico`
+          );
+          url.searchParams.set('limite', '1000');
+          url.searchParams.set('janelaSegundos', String(CHART_WINDOW_SECONDS));
+
+          const response = await fetch(url.toString(), { signal: controller.signal });
+          if (!response.ok) throw new Error(`Erro HTTP ${response.status}`);
+          const payload: unknown = await response.json();
+          if (!payload || typeof payload !== 'object' || !('pontos' in payload) || !Array.isArray(payload.pontos)) {
+            throw new Error('Resposta de histórico inválida');
+          }
+
+          const points = payload.pontos.flatMap((point: unknown) => {
+            if (!point || typeof point !== 'object') return [];
+            const record = point as { timestamp?: unknown; energia_kwh?: unknown };
+            const timestamp = typeof record.timestamp === 'string' ? Date.parse(record.timestamp) : NaN;
+            const value = typeof record.energia_kwh === 'number'
+              ? record.energia_kwh
+              : typeof record.energia_kwh === 'string' && record.energia_kwh.trim()
+                ? Number(record.energia_kwh)
+                : NaN;
+            return Number.isFinite(timestamp) && Number.isFinite(value)
+              ? [{ timestamp, value }]
+              : [];
+          });
+
+          return [serviceId, points] as const;
+        }));
+
+        if (!controller.signal.aborted) setChartHistory(Object.fromEntries(histories));
+      } catch {
+        if (!controller.signal.aborted) {
+          setChartHistoryError('Não foi possível carregar o histórico real dos serviços selecionados.');
+          setChartHistory({});
+        }
+      } finally {
+        if (!controller.signal.aborted) setIsLoadingChartHistory(false);
+      }
+    };
+
+    void loadHistory();
+    return () => controller.abort();
+  }, [selectedServiceIds]);
+
   const countryOptions = useMemo(() => [
     { label: 'Todos os países', value: '' },
     ...Array.from(new Set(dashboardServices.map(service => service.country).filter(Boolean))).map(
@@ -576,23 +510,19 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onOpenRanking }) =
     sortMetric,
   ]);
 
-  const selectedServicesForChart = useMemo(
-    () =>
-      selectedServiceCodes
-        .map((code) => SIMULATED_CHART_DATA.find((service) => service.code === code))
-        .filter((item): item is DemoDashboardServiceRow => Boolean(item)),
-    [selectedServiceCodes]
-  );
+  const selectedServicesForChart: DashboardChartService[] = dashboardServices
+    .filter(service => selectedServiceIds.includes(service.id))
+    .map(service => ({
+      id: service.id,
+      name: service.name,
+      points: chartHistory[service.id] ?? []
+    }));
 
-  const toggleServiceSelection = (code: string) => {
-    setSelectedServiceCodes((prev) => {
-      if (prev.includes(code)) {
-        return prev.filter((item) => item !== code);
-      }
-      if (prev.length >= 5) {
-        return prev;
-      }
-      return [...prev, code];
+  const toggleServiceSelection = (serviceId: string) => {
+    setSelectedServiceIds(previous => {
+      if (previous.includes(serviceId)) return previous.filter(id => id !== serviceId);
+      if (previous.length >= MAX_CHART_SERVICES) return previous;
+      return [...previous, serviceId];
     });
   };
 
@@ -638,7 +568,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onOpenRanking }) =
   const chartBottom = 204;
   const chartWidth = chartRight - chartLeft;
   const chartHeight = chartBottom - chartTop;
-  const maxVal = 60;
+  const chartNow = Date.now();
+  const chartStart = chartNow - CHART_WINDOW_SECONDS * 1000;
+  const maxObservedValue = Math.max(
+    0,
+    ...selectedServicesForChart.flatMap(service => service.points.map(point => point.value))
+  );
+  const maxVal = maxObservedValue > 0 ? maxObservedValue * 1.1 : 1;
 
   if (isComparingServices) {
     return <ServiceComparisonPage onBack={() => setIsComparingServices(false)} />;
@@ -783,7 +719,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onOpenRanking }) =
         )}
 
         <p className="mt-2 text-[11px] sm:text-xs text-[#9DB0A4]">
-          Indicadores e lista de serviços vêm da API. As séries do gráfico de uso são apenas uma demonstração simulada.
+          Indicadores, lista e histórico de consumo dos serviços vêm da API.
         </p>
       </div>
 
@@ -938,50 +874,65 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onOpenRanking }) =
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 mb-4">
           <div>
             <h3 className="font-bold text-lg sm:text-xl text-[#F2FAF5]">
-              Demonstração de uso em tempo real
+              Consumo dos serviços em tempo real
             </h3>
             <p className="text-[#9DB0A4] text-xs sm:text-sm mt-0.5">
-              Séries simuladas de consumo · não representam os serviços listados
+              Leituras reais de energia coletadas na última hora
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <span className="px-3.5 py-1 rounded-full bg-[#0B1C12] border-2 border-[#385E47] text-xs text-[#9DB0A4] font-medium">
-              {selectedServicesForChart.length} de 5 serviços
+              {selectedServicesForChart.length} de {MAX_CHART_SERVICES} serviços
             </span>
             <span className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#0B1C12] border-2 border-[#385E47] text-xs text-[#D4E3DA] font-medium">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#EAB308]" />
-              Dados simulados
+              <span className="w-2.5 h-2.5 rounded-full bg-[#2FA862]" />
+              Dados da API
             </span>
           </div>
         </div>
 
-        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3 mb-4">
-          <div className="flex items-baseline gap-2.5">
-            <span className="text-2xl sm:text-3xl font-bold text-[#F2FAF5]">kWh</span>
-            <span className="text-xs sm:text-sm text-[#9DB0A4]">
-              total dos {selectedServicesForChart.length} serviços
-            </span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {selectedServicesForChart.map((svc, idx) => {
-              const colorSet = SERIES_COLORS[idx % SERIES_COLORS.length];
-              return (
-                <button
-                  key={svc.code}
-                  type="button"
-                  onClick={() => toggleServiceSelection(svc.code)}
-                  aria-label={`Remover ${svc.code} da demonstração`}
-                  title="Clique para remover da demonstração simulada"
-                  className={`px-3 py-1 rounded-lg bg-[#0B1C12] border-2 ${colorSet.border} text-xs font-semibold text-[#F2FAF5] hover:bg-[#152E1F] transition-colors cursor-pointer`}
-                >
-                  {svc.code}
-                </button>
-              );
-            })}
-          </div>
+        <div className="mb-4 rounded-xl border border-[#385E47] bg-[#09180F] p-3">
+          <p className="mb-2 text-xs font-medium text-[#D4E3DA]">Selecione até {MAX_CHART_SERVICES} serviços reais para comparar</p>
+          {dashboardServices.length === 0 ? (
+            <p className="text-xs text-[#9DB0A4]">Nenhum serviço disponível na API.</p>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {dashboardServices.map((service, index) => {
+                const checked = selectedServiceIds.includes(service.id);
+                const disabled = !checked && selectedServiceIds.length >= MAX_CHART_SERVICES;
+                const colorSet = SERIES_COLORS[index % SERIES_COLORS.length];
+                return (
+                  <label
+                    key={service.id}
+                    className={`flex min-w-0 items-center gap-2 rounded-lg border px-2.5 py-2 text-xs ${
+                      checked ? `${colorSet.border} text-[#F2FAF5]` : 'border-[#385E47] text-[#D4E3DA]'
+                    } ${disabled ? 'opacity-50' : 'cursor-pointer'}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={disabled}
+                      onChange={() => toggleServiceSelection(service.id)}
+                      aria-label={service.name}
+                      className="accent-[#14C45A]"
+                    />
+                    <span className="truncate">{service.name}</span>
+                  </label>
+                );
+              })}
+            </div>
+          )}
         </div>
+
+        {isLoadingChartHistory && <p role="status" className="mb-3 text-xs text-[#9DB0A4]">Carregando histórico real dos serviços…</p>}
+        {chartHistoryError && <p role="alert" className="mb-3 text-xs text-[#FCA5A5]">{chartHistoryError}</p>}
+        {!isLoadingChartHistory && !chartHistoryError && selectedServicesForChart.length > 0 && selectedServicesForChart.every(service => service.points.length === 0) && (
+          <p aria-live="polite" className="mb-3 text-xs text-[#9DB0A4]">Não há medições de energia na última hora para os serviços selecionados.</p>
+        )}
+        {selectedServicesForChart.length === 0 && (
+          <p aria-live="polite" className="mb-3 text-xs text-[#9DB0A4]">Selecione um ou mais serviços para carregar o histórico.</p>
+        )}
 
         {/* Gráfico de linhas comparativo SVG */}
         <div className="w-full overflow-x-auto">
@@ -1012,10 +963,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onOpenRanking }) =
               Consumo (kWh)
             </text>
 
-            {[0, 15, 30, 45, 60].map((tick) => {
-              const y = chartBottom - (tick / maxVal) * chartHeight;
+            {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+              const tick = maxVal * ratio;
+              const y = chartBottom - ratio * chartHeight;
               return (
-                <g key={tick}>
+                <g key={ratio}>
                   <text
                     x={chartLeft - 12}
                     y={y + 4}
@@ -1023,7 +975,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onOpenRanking }) =
                     fill="#9DB0A4"
                     fontSize="12"
                   >
-                    {tick}
+                    {formatEnvironmentalMetric(tick, 'kWh').formattedValue}
                   </text>
                   <line
                     x1={chartLeft}
@@ -1086,48 +1038,44 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onOpenRanking }) =
 
             {selectedServicesForChart.map((svc, idx) => {
               const colorSet = SERIES_COLORS[idx % SERIES_COLORS.length];
-              const coords = svc.series.map((val, pointIdx) => ({
-                x:
-                  chartLeft +
-                  (pointIdx / Math.max(svc.series.length - 1, 1)) *
-                    chartWidth,
+              const coords = svc.points.map(point => ({
+                ...point,
+                x: chartLeft + Math.min(1, Math.max(0, (point.timestamp - chartStart) / (CHART_WINDOW_SECONDS * 1000))) * chartWidth,
                 y:
                   chartBottom -
-                  (Math.min(maxVal, Math.max(0, val)) / maxVal) *
+                  (Math.min(maxVal, Math.max(0, point.value)) / maxVal) *
                     chartHeight,
               }));
 
               const lastPoint = coords[coords.length - 1];
 
               return (
-                <g key={svc.code}>
-                  <path
-                    d={buildSmoothSvgPath(coords)}
-                    fill="none"
-                    stroke={colorSet.stroke}
-                    strokeWidth="2.6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    pathLength="1"
-                    strokeDasharray="1"
-                    strokeDashoffset="1"
-                    style={{
-                      animation:
-                        'dashboardLineDraw 900ms cubic-bezier(0.22, 1, 0.36, 1) forwards',
-                    }}
-                  />
+                <g key={svc.id}>
+                  {coords.length > 1 && (
+                    <path
+                      d={buildSmoothSvgPath(coords)}
+                      fill="none"
+                      stroke={colorSet.stroke}
+                      strokeWidth="2.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      pathLength="1"
+                      strokeDasharray="1"
+                      strokeDashoffset="1"
+                      style={{
+                        animation:
+                          'dashboardLineDraw 900ms cubic-bezier(0.22, 1, 0.36, 1) forwards',
+                      }}
+                    />
+                  )}
 
                   {coords.map((point, pointIdx) => {
-                    const minutesAgo =
-                      60 -
-                      Math.round(
-                        (pointIdx / Math.max(svc.series.length - 1, 1)) * 60
-                      );
+                    const minutesAgo = Math.max(0, Math.round((chartNow - point.timestamp) / 60_000));
 
                     const showPointTooltip = () =>
                       setChartTooltip({
-                        serviceCode: svc.code,
-                        value: svc.series[pointIdx],
+                        serviceCode: svc.name,
+                        value: point.value,
                         minutes: minutesAgo,
                         x: point.x,
                         y: point.y,
@@ -1136,7 +1084,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onOpenRanking }) =
 
                     return (
                       <circle
-                        key={`${svc.code}-${pointIdx}`}
+                        key={`${svc.id}-${pointIdx}`}
                         cx={point.x}
                         cy={point.y}
                         r="9"
@@ -1144,7 +1092,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onOpenRanking }) =
                         className="cursor-pointer"
                         tabIndex={0}
                         role="button"
-                        aria-label={`${svc.code}: ${svc.series[pointIdx]} kWh, ${minutesAgo} minutos atrás`}
+                        aria-label={`${svc.name}: ${point.value} kWh, ${minutesAgo} minutos atrás`}
                         onMouseEnter={showPointTooltip}
                         onMouseLeave={() => setChartTooltip(null)}
                         onFocus={showPointTooltip}
