@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 
 // Importação das páginas de utilizador
 import { Login } from './pages/LoginPage';
-import { Register } from './pages/Register';
-import { RegisterStep2 } from './pages/RegisterStep2';
+import { Register, type DadosCadastro } from './pages/Register';
+import { RegisterStep2, type DadosPreferencias } from './pages/RegisterStep2';
 import { RegisterStep3 } from './pages/RegisterStep3';
 
 // Importação das páginas administrativas
@@ -26,6 +26,16 @@ export function App() {
   >('login');
 
   const [sessionMessage, setSessionMessage] = useState<string | null>(null);
+  const [registrationData, setRegistrationData] = useState<DadosCadastro>({
+    nome: '',
+    sobrenome: '',
+    email: '',
+    telefone: '',
+  });
+  const [registrationPreferences, setRegistrationPreferences] = useState<DadosPreferencias>({
+    tempoAtualizacao: '',
+    localizacao: '',
+  });
 
   useEffect(() => {
     const handleExpired = (event: Event) => {
@@ -66,7 +76,12 @@ export function App() {
   if (currentScreen === 'register') {
     return (
       <Register
-        onNextStep={() => setCurrentScreen('register-step2')} 
+        initialData={registrationData}
+        onNextStep={(dados) => {
+          setRegistrationData(dados);
+          setCurrentScreen('register-step2');
+        }}
+        onGoToLogin={() => setCurrentScreen('login')}
       />
     );
   }
@@ -74,7 +89,12 @@ export function App() {
   if (currentScreen === 'register-step2') {
     return (
       <RegisterStep2
-        onNextStep={() => setCurrentScreen('register-step3')} 
+        initialData={registrationPreferences}
+        onNextStep={(prefs) => {
+          if (prefs) setRegistrationPreferences(prefs);
+          setCurrentScreen('register-step3');
+        }}
+        onPrevStep={() => setCurrentScreen('register')}
       />
     );
   }
@@ -82,7 +102,12 @@ export function App() {
   if (currentScreen === 'register-step3') {
     return (
       <RegisterStep3
-        onFinish={() => setCurrentScreen('map')} 
+        registrationData={registrationData}
+        onPrevStep={() => setCurrentScreen('register-step2')}
+        onGoToLogin={() => setCurrentScreen('login')}
+        onFinish={() => {
+          // Mantém opção para retorno ao login ou navegação direta
+        }}
       />
     );
   }

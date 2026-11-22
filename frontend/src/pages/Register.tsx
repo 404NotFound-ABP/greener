@@ -1,10 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { OrbitsBackground } from '../components/auth/OrbitsBackground';
 import { GreenerGlobeLogo } from '../components/auth/GreenerGlobeLogo';
-
-interface RegisterProps {
-  onNextStep?: (dados: DadosCadastro) => void;
-}
 
 export interface DadosCadastro {
   nome: string;
@@ -13,13 +9,30 @@ export interface DadosCadastro {
   telefone: string;
 }
 
-export const Register: React.FC<RegisterProps> = ({ onNextStep }) => {
-  const [formData, setFormData] = useState({
-    nome: '',
-    sobrenome: '',
-    email: '',
-    telefone: '',
+interface RegisterProps {
+  initialData?: Partial<DadosCadastro>;
+  onNextStep?: (dados: DadosCadastro) => void;
+  onGoToLogin?: () => void;
+}
+
+export const Register: React.FC<RegisterProps> = ({ initialData, onNextStep, onGoToLogin }) => {
+  const [formData, setFormData] = useState<DadosCadastro>({
+    nome: initialData?.nome ?? '',
+    sobrenome: initialData?.sobrenome ?? '',
+    email: initialData?.email ?? '',
+    telefone: initialData?.telefone ?? '',
   });
+
+  useEffect(() => {
+    if (initialData) {
+      setFormData((prev) => ({
+        nome: initialData.nome ?? prev.nome,
+        sobrenome: initialData.sobrenome ?? prev.sobrenome,
+        email: initialData.email ?? prev.email,
+        telefone: initialData.telefone ?? prev.telefone,
+      }));
+    }
+  }, [initialData]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -111,11 +124,20 @@ export const Register: React.FC<RegisterProps> = ({ onNextStep }) => {
             />
           </div>
 
-          {/* Botão Avançar */}
-          <div className="w-full flex justify-end mt-1 sm:mt-2">
+          {/* Ações: Voltar ao Login e Avançar */}
+          <div className="w-full flex flex-col-reverse sm:flex-row items-center justify-between gap-3 mt-1 sm:mt-2">
+            {onGoToLogin ? (
+              <button
+                type="button"
+                onClick={onGoToLogin}
+                className="text-[#D4E3DA] hover:text-[#14C45A] text-sm underline cursor-pointer transition-colors"
+              >
+                Já tem uma conta? Entrar
+              </button>
+            ) : <span />}
             <button
               type="submit"
-              className="w-full sm:w-auto h-[46px] sm:h-[48px] px-6 sm:px-[36px] bg-[#2FA862] hover:bg-[#14C45A] rounded-[10px] flex justify-center items-center text-white text-[15px] sm:text-[16px] font-medium transition-colors cursor-pointer shadow-lg"
+              className="w-full sm:w-auto h-[46px] sm:h-[48px] px-6 sm:px-[36px] bg-[#2FA862] hover:bg-[#14C45A] rounded-[10px] flex justify-center items-center text-white text-[15px] sm:text-[16px] font-medium transition-colors cursor-pointer shadow-lg ml-auto"
             >
               Avançar
             </button>

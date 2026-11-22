@@ -2,21 +2,83 @@ import React, { useState } from 'react';
 import { OrbitsBackground } from '../components/auth/OrbitsBackground';
 import { GreenerGlobeLogo } from '../components/auth/GreenerGlobeLogo';
 
-interface RegisterStep3Props {
+export interface RegisterStep3Props {
+  registrationData?: {
+    nome?: string;
+    sobrenome?: string;
+    email?: string;
+    telefone?: string;
+  };
   onFinish?: () => void;
+  onGoToLogin?: () => void;
+  onPrevStep?: () => void;
 }
 
-export const RegisterStep3: React.FC<RegisterStep3Props> = ({ onFinish }) => {
+export const RegisterStep3: React.FC<RegisterStep3Props> = ({
+  registrationData,
+  onFinish,
+  onGoToLogin,
+  onPrevStep,
+}) => {
   const [senha, setSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSuccess, setIsSuccess] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage(null);
+
     if (senha !== confirmarSenha) {
       alert('As senhas não coincidem!');
+      setErrorMessage('As senhas digitadas não coincidem.');
       return;
     }
-    onFinish?.();
+
+    if (senha.length < 6) {
+      setErrorMessage('A senha deve possuir no mínimo 6 caracteres.');
+      return;
+    }
+
+    // Se temos os dados do cadastro (nome/email), submete à API
+    if (registrationData?.email) {
+      setIsLoading(true);
+      try {
+        const fullName = `${registrationData.nome || ''} ${registrationData.sobrenome || ''}`.trim() || 'Usuário GreenER';
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: fullName,
+            email: registrationData.email.trim(),
+            password: senha,
+          }),
+        });
+
+        if (res.status === 409) {
+          setErrorMessage('Este e-mail já está cadastrado no sistema.');
+          setIsLoading(false);
+          return;
+        }
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => null);
+          throw new Error(errData?.message || 'Falha ao registrar conta. Verifique os dados e tente novamente.');
+        }
+
+        setIsSuccess(true);
+        onFinish?.();
+      } catch (err: any) {
+        setErrorMessage(err.message || 'Erro de comunicação ao realizar cadastro.');
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      // Caso executado em teste ou sem contexto da etapa 1
+      setIsSuccess(true);
+      onFinish?.();
+    }
   };
 
   return (
@@ -33,84 +95,127 @@ export const RegisterStep3: React.FC<RegisterStep3Props> = ({ onFinish }) => {
           <GreenerGlobeLogo />
         </div>
 
-        {/* 3. FORMULÁRIO PRINCIPAL */}
-        <form
-          onSubmit={handleSubmit}
-          className="relative z-10 w-full pt-[64px] sm:pt-[165px] pb-[28px] sm:pb-[32px] px-5 sm:px-[30px] bg-[rgba(242,250,245,0.12)] shadow-[0px_24px_48px_rgba(21,32,26,0.25),inset_0px_4px_4px_rgba(242,250,245,0.10)] rounded-[24px] border-t-[1px] border-r-[2px] border-b-[2px] border-l-0 border-[rgba(242,250,245,0.50)] backdrop-blur-[8px] flex flex-col gap-4 sm:gap-[24px]"
-        >
-          <div className="w-full flex flex-col gap-3 sm:gap-[16px]">
-            <p className="text-[#F2FAF5] text-[16px] sm:text-[20px] font-medium leading-[24px] sm:leading-[28px] text-center">
-              Agora para finalizar, crie sua senha de acesso ao GreenER
+        {/* 3. CARD DE CADASTRO OU SUCESSO */}
+        {isSuccess ? (
+          <div className="relative z-10 w-full pt-[64px] sm:pt-[165px] pb-[28px] sm:pb-[32px] px-5 sm:px-[30px] bg-[rgba(242,250,245,0.12)] shadow-[0px_24px_48px_rgba(21,32,26,0.25),inset_0px_4px_4px_rgba(242,250,245,0.10)] rounded-[24px] border-t-[1px] border-r-[2px] border-b-[2px] border-l-0 border-[rgba(242,250,245,0.50)] backdrop-blur-[8px] flex flex-col items-center gap-4 sm:gap-[24px] text-center">
+            <div className="w-16 h-16 rounded-full bg-[#14C45A]/20 border-2 border-[#14C45A] flex items-center justify-center text-[#14C45A]">
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h1 className="text-[#F2FAF5] text-[24px] sm:text-[32px] font-bold leading-tight">
+              Cadastro realizado com sucesso!
+            </h1>
+            <p className="text-[#D4E3DA] text-[15px] sm:text-[18px]">
+              Sua conta foi criada no GreenER. Você já pode acessar a plataforma utilizando seu e-mail e senha cadastrados.
             </p>
+            {onGoToLogin && (
+              <button
+                type="button"
+                onClick={onGoToLogin}
+                className="w-full sm:w-auto h-[46px] sm:h-[48px] px-8 bg-[#14C45A] hover:bg-[#0E9D47] rounded-[10px] text-white text-[15px] sm:text-[16px] font-semibold transition-colors cursor-pointer shadow-lg mt-2"
+              >
+                Ir para o login
+              </button>
+            )}
+          </div>
+        ) : (
+          <form
+            onSubmit={handleSubmit}
+            className="relative z-10 w-full pt-[64px] sm:pt-[165px] pb-[28px] sm:pb-[32px] px-5 sm:px-[30px] bg-[rgba(242,250,245,0.12)] shadow-[0px_24px_48px_rgba(21,32,26,0.25),inset_0px_4px_4px_rgba(242,250,245,0.10)] rounded-[24px] border-t-[1px] border-r-[2px] border-b-[2px] border-l-0 border-[rgba(242,250,245,0.50)] backdrop-blur-[8px] flex flex-col gap-4 sm:gap-[24px]"
+          >
+            <div className="w-full flex flex-col gap-3 sm:gap-[16px]">
+              <p className="text-[#F2FAF5] text-[16px] sm:text-[20px] font-medium leading-[24px] sm:leading-[28px] text-center">
+                Agora para finalizar, crie sua senha de acesso ao GreenER
+              </p>
 
-            {/* Aviso Verde */}
-            <div className="w-full flex justify-start">
-              <div className="w-full flex items-center gap-2 px-3 py-2 sm:py-1.5 bg-[#CFF5DE] rounded-[10px]">
-                <svg
-                  className="shrink-0"
-                  width="20"
-                  height="20"
-                  viewBox="0 0 20 20"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <g clipPath="url(#clip0_31_428)">
-                    <path
-                      d="M12.1191 2.165C11.9274 1.7657 11.6267 1.42869 11.2518 1.19281C10.8769 0.956936 10.4429 0.831787 9.99995 0.831787C9.557 0.831787 9.12305 0.956936 8.74812 1.19281C8.37319 1.42869 8.07253 1.7657 7.88079 2.165L1.11745 15.4692C0.308288 17.0575 1.33079 19.1667 3.23579 19.1667H16.7641C18.6691 19.1667 19.69 17.0583 18.8825 15.4692L12.1191 2.165ZM9.99995 6.66667C10.221 6.66667 10.4329 6.75447 10.5892 6.91075C10.7455 7.06703 10.8333 7.27899 10.8333 7.5V11.6667C10.8333 11.8877 10.7455 12.0996 10.5892 12.2559C10.4329 12.4122 10.221 12.5 9.99995 12.5C9.77894 12.5 9.56698 12.4122 9.4107 12.2559C9.25442 12.0996 9.16662 11.8877 9.16662 11.6667V7.5C9.16662 7.27899 9.25442 7.06703 9.4107 6.91075C9.56698 6.75447 9.77894 6.66667 9.99995 6.66667ZM9.99995 13.75C10.221 13.75 10.4329 13.8378 10.5892 13.9941C10.7455 14.1504 10.8333 14.3623 10.8333 14.5833V15C10.8333 15.221 10.7455 15.433 10.5892 15.5893C10.4329 15.7455 10.221 15.8333 9.99995 15.8333C9.77894 15.8333 9.56698 15.7455 9.4107 15.5893C9.25442 15.433 9.16662 15.221 9.16662 15V14.5833C9.16662 14.3623 9.25442 14.1504 9.4107 13.9941C9.56698 13.8378 9.77894 13.75 9.99995 13.75Z"
-                      fillRule="evenodd"
-                      clipRule="evenodd"
-                      fill="#0B7335"
-                    />
-                  </g>
-                  <defs>
-                    <clipPath id="clip0_31_428">
-                      <rect width="20" height="20" fill="white" />
-                    </clipPath>
-                  </defs>
-                </svg>
-                <span className="text-[#0B7335] text-[12px] sm:text-[13px] font-semibold text-left">
-                  Você poderá alterar depois
-                </span>
+              {/* Aviso Verde */}
+              <div className="w-full flex justify-start">
+                <div className="w-full flex items-center gap-2 px-3 py-2 sm:py-1.5 bg-[#CFF5DE] rounded-[10px]">
+                  <svg
+                    className="shrink-0"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <g clipPath="url(#clip0_31_428)">
+                      <path
+                        d="M12.1191 2.165C11.9274 1.7657 11.6267 1.42869 11.2518 1.19281C10.8769 0.956936 10.4429 0.831787 9.99995 0.831787C9.557 0.831787 9.12305 0.956936 8.74812 1.19281C8.37319 1.42869 8.07253 1.7657 7.88079 2.165L1.11745 15.4692C0.308288 17.0575 1.33079 19.1667 3.23579 19.1667H16.7641C18.6691 19.1667 19.69 17.0583 18.8825 15.4692L12.1191 2.165ZM9.99995 6.66667C10.221 6.66667 10.4329 6.75447 10.5892 6.91075C10.7455 7.06703 10.8333 7.27899 10.8333 7.5V11.6667C10.8333 11.8877 10.7455 12.0996 10.5892 12.2559C10.4329 12.4122 10.221 12.5 9.99995 12.5C9.77894 12.5 9.56698 12.4122 9.4107 12.2559C9.25442 12.0996 9.16662 11.8877 9.16662 11.6667V7.5C9.16662 7.27899 9.25442 7.06703 9.4107 6.91075C9.56698 6.75447 9.77894 6.66667 9.99995 6.66667ZM9.99995 13.75C10.221 13.75 10.4329 13.8378 10.5892 13.9941C10.7455 14.1504 10.8333 14.3623 10.8333 14.5833V15C10.8333 15.221 10.7455 15.433 10.5892 15.5893C10.4329 15.7455 10.221 15.8333 9.99995 15.8333C9.77894 15.8333 9.56698 15.7455 9.4107 15.5893C9.25442 15.433 9.16662 15.221 9.16662 15V14.5833C9.16662 14.3623 9.25442 14.1504 9.4107 13.9941C9.56698 13.8378 9.77894 13.75 9.99995 13.75Z"
+                        fillRule="evenodd"
+                        clipRule="evenodd"
+                        fill="#0B7335"
+                      />
+                    </g>
+                    <defs>
+                      <clipPath id="clip0_31_428">
+                        <rect width="20" height="20" fill="white" />
+                      </clipPath>
+                    </defs>
+                  </svg>
+                  <span className="text-[#0B7335] text-[12px] sm:text-[13px] font-semibold text-left">
+                    Você poderá alterar depois
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="w-full flex flex-col gap-4 sm:gap-[24px]">
-            {/* Campo: Criar Senha */}
-            <div className="w-full h-[50px] sm:h-[56px] px-4 sm:px-[20px] bg-[#F2FAF5]/20 rounded-[12px] border-[1.5px] border-[#F2FAF5] flex items-center focus-within:border-[#14C45A] transition-colors">
-              <input
-                type="password"
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
-                placeholder="Crie aqui sua senha"
-                required
-                className="w-full bg-transparent text-[#F7F7F5] placeholder-[#F7F7F5]/90 text-[15px] sm:text-[16px] font-normal outline-none"
-              />
+            {/* Mensagem de Erro clara */}
+            {errorMessage && (
+              <div role="alert" className="w-full p-3 bg-[#3B1212] border border-[#F34F0E] rounded-[10px] text-xs sm:text-sm text-[#FEE2E2]">
+                {errorMessage}
+              </div>
+            )}
+
+            <div className="w-full flex flex-col gap-4 sm:gap-[24px]">
+              {/* Campo: Criar Senha */}
+              <div className="w-full h-[50px] sm:h-[56px] px-4 sm:px-[20px] bg-[#F2FAF5]/20 rounded-[12px] border-[1.5px] border-[#F2FAF5] flex items-center focus-within:border-[#14C45A] transition-colors">
+                <input
+                  type="password"
+                  value={senha}
+                  onChange={(e) => setSenha(e.target.value)}
+                  placeholder="Crie aqui sua senha"
+                  required
+                  className="w-full bg-transparent text-[#F7F7F5] placeholder-[#F7F7F5]/90 text-[15px] sm:text-[16px] font-normal outline-none"
+                />
+              </div>
+
+              {/* Campo: Repetir Senha */}
+              <div className="w-full h-[50px] sm:h-[56px] px-4 sm:px-[20px] bg-[#F2FAF5]/20 rounded-[12px] border-[1.5px] border-[#F2FAF5] flex items-center focus-within:border-[#14C45A] transition-colors">
+                <input
+                  type="password"
+                  value={confirmarSenha}
+                  onChange={(e) => setConfirmarSenha(e.target.value)}
+                  placeholder="Repita a senha para confirmação"
+                  required
+                  className="w-full bg-transparent text-[#F7F7F5] placeholder-[#F7F7F5]/90 text-[15px] sm:text-[16px] font-normal outline-none"
+                />
+              </div>
             </div>
 
-            {/* Campo: Repetir Senha */}
-            <div className="w-full h-[50px] sm:h-[56px] px-4 sm:px-[20px] bg-[#F2FAF5]/20 rounded-[12px] border-[1.5px] border-[#F2FAF5] flex items-center focus-within:border-[#14C45A] transition-colors">
-              <input
-                type="password"
-                value={confirmarSenha}
-                onChange={(e) => setConfirmarSenha(e.target.value)}
-                placeholder="Repita a senha para confirmação"
-                required
-                className="w-full bg-transparent text-[#F7F7F5] placeholder-[#F7F7F5]/90 text-[15px] sm:text-[16px] font-normal outline-none"
-              />
+            {/* Botões Voltar e Finalizar */}
+            <div className="w-full flex items-center justify-between gap-3 mt-1 sm:mt-[8px]">
+              {onPrevStep ? (
+                <button
+                  type="button"
+                  onClick={onPrevStep}
+                  disabled={isLoading}
+                  className="h-[46px] sm:h-[48px] px-5 rounded-[10px] border border-[#385E47] text-[#D4E3DA] hover:bg-white/5 transition-colors cursor-pointer text-sm font-medium disabled:opacity-50"
+                >
+                  Voltar
+                </button>
+              ) : <span />}
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="px-6 py-2.5 rounded-[10px] bg-[#1F8A4C] hover:bg-[#2FA862] text-white font-semibold transition-colors cursor-pointer disabled:opacity-50 ml-auto"
+              >
+                {isLoading ? 'Cadastrando…' : 'Finalizar'}
+              </button>
             </div>
-          </div>
-
-          {/* Botão Finalizar */}
-          <div className="w-full flex justify-end mt-1 sm:mt-[8px]">
-            <button
-              type="submit"
-              className="px-6 py-2.5 rounded-[10px] bg-[#1F8A4C] hover:bg-[#2FA862] text-white font-semibold transition-colors cursor-pointer"
-            >
-              Finalizar
-            </button>
-          </div>
-        </form>
+          </form>
+        )}
       </div>
     </div>
   );

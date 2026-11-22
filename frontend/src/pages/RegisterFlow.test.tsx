@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Register } from './Register';
 import { RegisterStep2 } from './RegisterStep2';
@@ -7,6 +7,7 @@ import { RegisterStep3 } from './RegisterStep3';
 describe('cadastro em etapas', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it('exige os campos da primeira etapa antes de avançar', () => {
@@ -109,5 +110,91 @@ describe('cadastro em etapas', () => {
 
     // Assert
     expect(concluir).toHaveBeenCalledTimes(1);
+  });
+
+  it('submete os dados ao endpoint de cadastro com sucesso e permite retornar ao login', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => ({ id: 10, name: 'Carlos Lima', email: 'carlos@example.com' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const onLogin = vi.fn();
+    const onFinish = vi.fn();
+
+    render(
+      <RegisterStep3
+        registrationData={{
+          nome: 'Carlos',
+          sobrenome: 'Lima',
+          email: 'carlos@example.com',
+          telefone: '11988888888',
+        }}
+        onGoToLogin={onLogin}
+        onFinish={onFinish}
+      />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText('Crie aqui sua senha'), {
+      target: { value: 'senhaForte123' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('Repita a senha para confirmação'), {
+      target: { value: 'senhaForte123' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Finalizar' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Cadastro realizado com sucesso!')).toBeInTheDocument();
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/auth/register', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'Carlos Lima',
+        email: 'carlos@example.com',
+        password: 'senhaForte123',
+      }),
+    }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ir para o login' }));
+    expect(onLogin).toHaveBeenCalledTimes(1);
+  });
+
+  it('informa erro claro e preserva campos preenchidos quando e-mail já existe (409)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 409,
+      json: async () => ({ message: 'Email já cadastrado' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <RegisterStep3
+        registrationData={{
+          nome: 'Ana',
+          sobrenome: 'Silva',
+          email: 'ana@example.com',
+          telefone: '11999999999',
+        }}
+      />,
+    );
+
+    const inputSenha = screen.getByPlaceholderText('Crie aqui sua senha');
+    const inputConfirmar = screen.getByPlaceholderText('Repita a senha para confirmação');
+
+    fireEvent.change(inputSenha, { target: { value: 'senha123' } });
+    fireEvent.change(inputConfirmar, { target: { value: 'senha123' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Finalizar' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Este e-mail já está cadastrado no sistema.');
+    });
+
+    // Dados permanecem preservados nos inputs
+    expect(inputSenha).toHaveValue('senha123');
+    expect(inputConfirmar).toHaveValue('senha123');
   });
 });

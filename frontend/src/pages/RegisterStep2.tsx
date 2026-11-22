@@ -2,8 +2,15 @@ import React, { useState } from 'react';
 import { OrbitsBackground } from '../components/auth/OrbitsBackground';
 import { GreenerGlobeLogo } from '../components/auth/GreenerGlobeLogo';
 
+export interface DadosPreferencias {
+  tempoAtualizacao: string;
+  localizacao: string;
+}
+
 interface RegisterStep2Props {
-  onNextStep?: () => void;
+  initialData?: Partial<DadosPreferencias>;
+  onNextStep?: (dados?: DadosPreferencias) => void;
+  onPrevStep?: () => void;
 }
 
 // =========================================================================
@@ -91,9 +98,13 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
 // === COMPONENTE 2: PÁGINA PRINCIPAL (RegisterStep2) ======================
 // =========================================================================
 
-export const RegisterStep2: React.FC<RegisterStep2Props> = ({ onNextStep }) => {
-  const [tempoAtualizacao, setTempoAtualizacao] = useState('');
-  const [localizacao, setLocalizacao] = useState('');
+export const RegisterStep2: React.FC<RegisterStep2Props> = ({
+  initialData,
+  onNextStep,
+  onPrevStep,
+}) => {
+  const [tempoAtualizacao, setTempoAtualizacao] = useState(initialData?.tempoAtualizacao ?? '');
+  const [localizacao, setLocalizacao] = useState(initialData?.localizacao ?? '');
   const [openDropdown, setOpenDropdown] = useState<'tempo' | 'local' | null>(null);
   const [erroPreferencias, setErroPreferencias] = useState(false);
 
@@ -116,7 +127,7 @@ export const RegisterStep2: React.FC<RegisterStep2Props> = ({ onNextStep }) => {
       return;
     }
     setErroPreferencias(false);
-    onNextStep?.();
+    onNextStep?.({ tempoAtualizacao, localizacao });
   };
 
   return (
@@ -204,10 +215,19 @@ export const RegisterStep2: React.FC<RegisterStep2Props> = ({ onNextStep }) => {
             </p>
           )}
 
-          <div className="w-full flex justify-end mt-1 sm:mt-[8px]">
+          <div className="w-full flex items-center justify-between gap-3 mt-1 sm:mt-[8px]">
+            {onPrevStep ? (
+              <button
+                type="button"
+                onClick={onPrevStep}
+                className="h-[46px] sm:h-[48px] px-5 rounded-[10px] border border-[#385E47] text-[#D4E3DA] hover:bg-white/5 transition-colors cursor-pointer text-sm font-medium"
+              >
+                Voltar
+              </button>
+            ) : <span />}
             <button
               type="submit"
-              className="w-full sm:w-auto h-[46px] sm:h-[48px] px-6 sm:px-[28px] bg-[#2FA862] hover:bg-[#14C45A] rounded-[10px] flex justify-center items-center text-white text-[15px] sm:text-[16px] font-medium transition-colors cursor-pointer shadow-lg"
+              className="w-full sm:w-auto h-[46px] sm:h-[48px] px-6 sm:px-[28px] bg-[#2FA862] hover:bg-[#14C45A] rounded-[10px] flex justify-center items-center text-white text-[15px] sm:text-[16px] font-medium transition-colors cursor-pointer shadow-lg ml-auto"
             >
               Avançar
             </button>

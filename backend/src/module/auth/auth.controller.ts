@@ -5,6 +5,8 @@ import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto, UserPayloadDto } from './dto/login-response.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
+import { CreateUserDto } from '@/module/users/dto/create-user.dto';
+import { UserResponseDto } from '@/module/users/dto/user-response.dto';
 
 @ApiTags('Autenticação')
 @Controller('api/auth')
@@ -28,6 +30,25 @@ export class AuthController {
   })
   async login(@Body() loginDto: LoginDto): Promise<LoginResponseDto> {
     return this.authService.login(loginDto);
+  }
+
+  @Post('register')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Cadastro público de novo usuário',
+    description: 'Permite criar uma nova conta de usuário comum no sistema com senha protegida por hash bcrypt.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Usuário cadastrado com sucesso',
+    type: UserResponseDto,
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Email já cadastrado',
+  })
+  async register(@Body() createUserDto: CreateUserDto) {
+    return this.authService.register(createUserDto);
   }
 
   @Get('me')

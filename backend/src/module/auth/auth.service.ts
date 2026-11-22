@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, Inject } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, InternalServerErrorException, Inject } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { DRIZZLE_PROVIDER, DrizzleDB, schema } from '@/database';
@@ -69,5 +69,44 @@ export class AuthService {
     }
 
     return user;
+  }
+
+  async register(createUserDto: { name: string; email: string; password: string }) {
+    const emailNormalized = createUserDto.email.toLowerCase().trim();
+
+    const [existing] = await this.db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.email, emailNormalized))
+      .limit(1);
+
+    if (existing) {
+      throw new ConflictException(`Já existe um usuário cadastrado com o email "${createUserDto.email}".`);
+    }
+
+    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+
+    const [created] = await this.db
+      .insert(schema.users)
+      .values({
+        name: createUserDto.name.trim(),
+        email: emailNormalized,
+        password: hashedPassword,
+        role: 'user',
+      })
+      .returning({
+        id: schema.users.id,
+        name: schema.users.name,
+        email: schema.users.email,
+        role: schema.users.role,
+        created_at: schema.users.created_at,
+        updated_at: schema.users.updated_at,
+      });
+
+    if (!created) {
+      throw new InternalServerErrorException('Falha ao cadastrar usuário.');
+    }
+
+    return created;
   }
 }

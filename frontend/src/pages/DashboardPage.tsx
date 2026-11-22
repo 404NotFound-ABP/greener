@@ -350,11 +350,19 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onOpenRanking }) =
     },
     {
       title: 'Serviços ativos',
-      value: summary ? summary.disponiveis.toLocaleString('pt-BR') : '—'
+      value: summary
+        ? summary.disponiveis.toLocaleString('pt-BR')
+        : isInitialLoad
+          ? 'Carregando…'
+          : 'Indisponível'
     },
     {
       title: 'Serviços indisponíveis',
-      value: summary ? summary.indisponiveis.toLocaleString('pt-BR') : '—'
+      value: summary
+        ? summary.indisponiveis.toLocaleString('pt-BR')
+        : isInitialLoad
+          ? 'Carregando…'
+          : 'Indisponível'
     }
   ];
 
