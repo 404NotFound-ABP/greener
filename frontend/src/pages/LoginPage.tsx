@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { OrbitsBackground } from '../components/auth/OrbitsBackground';
 import { GreenerGlobeLogo } from '../components/auth/GreenerGlobeLogo';
+import { saveSession, type AuthUser } from '../utils/auth';
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api').replace(/\/$/, '');
 
@@ -8,20 +9,28 @@ interface LoginProps {
   onLoginSuccess?: () => void;
   onGoToRegister?: () => void;
   onAdminAccess?: () => void;
+  sessionMessage?: string | null;
 }
 
 export const Login: React.FC<LoginProps> = ({
   onLoginSuccess,
   onGoToRegister,
   onAdminAccess,
+  sessionMessage,
 }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [erro, setErro] = useState('');
+  const [erro, setErro] = useState(sessionMessage ?? '');
   const [carregando, setCarregando] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!email.trim() || !password) {
+      setErro('Preencha os campos de e-mail e senha.');
+      return;
+    }
+
     setCarregando(true);
     setErro('');
 
@@ -29,7 +38,7 @@ export const Login: React.FC<LoginProps> = ({
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email.trim(), password }),
       });
       if (!response.ok) {
         setErro(
@@ -51,7 +60,12 @@ export const Login: React.FC<LoginProps> = ({
         throw new Error('A resposta de autenticação não contém um token válido.');
       }
 
-      sessionStorage.setItem('accessToken', payload.accessToken);
+      const user =
+        'user' in payload && payload.user && typeof payload.user === 'object'
+          ? (payload.user as AuthUser)
+          : undefined;
+
+      saveSession(payload.accessToken, user);
       onLoginSuccess?.();
     } catch (error) {
       setErro(

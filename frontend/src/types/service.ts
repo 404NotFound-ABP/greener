@@ -14,6 +14,13 @@ export interface MetricsData {
   estimado?: boolean;
 }
 
+export interface InfrastructureMetrics {
+  cpuPercent?: number | null;
+  memoriaGb?: number | null;
+  discoGb?: number | null;
+  redeGb?: number | null;
+}
+
 export interface ServiceData {
   id: string;
   nome: string;
@@ -21,6 +28,7 @@ export interface ServiceData {
   localizacao?: LocationData | null;
   coords?: [number, number];
   valores: MetricsData;
+  infraestrutura?: InfrastructureMetrics;
   periodo?: string;
   estimado?: boolean;
   ultimaAtualizacao?: string;

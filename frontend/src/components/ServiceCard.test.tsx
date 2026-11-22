@@ -54,4 +54,25 @@ describe('ServiceCard', () => {
     // Assert
     expect(estados.length).toBeGreaterThan(0);
   });
+
+  it('mostra métricas de infraestrutura (CPU, memória, disco e rede) com unidades', () => {
+    render(
+      <ServiceCard
+        service={{
+          ...servico,
+          infraestrutura: {
+            cpuPercent: 45,
+            memoriaGb: 16,
+            discoGb: 500,
+            redeGb: 2.5,
+          },
+        }}
+      />
+    );
+
+    expect(screen.getByText('CPU: 45 %')).toBeInTheDocument();
+    expect(screen.getByText('Memória: 16 GB')).toBeInTheDocument();
+    expect(screen.getByText('Disco: 500 GB')).toBeInTheDocument();
+    expect(screen.getByText('Rede: 2.5 GB')).toBeInTheDocument();
+  });
 });

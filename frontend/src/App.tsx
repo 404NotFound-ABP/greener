@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 // Importação das páginas de utilizador
 import { Login } from './pages/LoginPage';
@@ -11,6 +11,7 @@ import { AdminLogin } from './pages/AdminLogin';
 import { AdminDashboard } from './pages/AdminDashboard';
 
 import { MainLayout } from './components/MainLayout';
+import { clearSession, isAdmin, isAuthenticated } from './utils/auth';
 
 export function App() {
   // Estado que controla qual ecrã está visível no momento
@@ -24,15 +25,40 @@ export function App() {
     | 'admin-dashboard'
   >('login');
 
+  const [sessionMessage, setSessionMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleExpired = (event: Event) => {
+      const custom = event as CustomEvent<{ message?: string }>;
+      setSessionMessage(custom.detail?.message || 'Sua sessão expirou. Por favor, faça login novamente.');
+      setCurrentScreen('login');
+    };
+
+    window.addEventListener('greener:session_expired', handleExpired);
+    return () => {
+      window.removeEventListener('greener:session_expired', handleExpired);
+    };
+  }, []);
+
+  const handleLogout = () => {
+    clearSession();
+    setSessionMessage(null);
+    setCurrentScreen('login');
+  };
+
   // ==========================================
   // FLUXO PÚBLICO (LOGIN E REGISTO)
   // ==========================================
   if (currentScreen === 'login') {
     return (
       <Login
-        onLoginSuccess={() => setCurrentScreen('map')}
+        onLoginSuccess={() => {
+          setSessionMessage(null);
+          setCurrentScreen('map');
+        }}
         onGoToRegister={() => setCurrentScreen('register')}
         onAdminAccess={() => setCurrentScreen('admin-login')}
+        sessionMessage={sessionMessage}
       />
     );
   }
@@ -67,21 +93,35 @@ export function App() {
   if (currentScreen === 'admin-login') {
     return (
       <AdminLogin
-        onLoginSuccess={() => setCurrentScreen('admin-dashboard')}
+        onLoginSuccess={() => {
+          setSessionMessage(null);
+          setCurrentScreen('admin-dashboard');
+        }}
       />
     );
   }
 
   if (currentScreen === 'admin-dashboard') {
+    if (!isAdmin()) {
+      return (
+        <AdminLogin
+          onLoginSuccess={() => {
+            setSessionMessage(null);
+            setCurrentScreen('admin-dashboard');
+          }}
+        />
+      );
+    }
+
     return (
       <AdminDashboard
-        onLogout={() => setCurrentScreen('login')}
+        onLogout={handleLogout}
         onViewPublicDashboard={() => setCurrentScreen('map')}
       />
     );
   }
 
-  return <MainLayout />;
+  return <MainLayout onLogout={handleLogout} />;
 }
 
 export default App;

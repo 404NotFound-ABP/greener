@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { OrbitsBackground } from '../components/auth/OrbitsBackground';
 import { GreenerGlobeLogo } from '../components/auth/GreenerGlobeLogo';
+import { saveSession, type AuthUser } from '../utils/auth';
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api').replace(/\/$/, '');
 
@@ -53,7 +54,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
         return;
       }
 
-      sessionStorage.setItem('accessToken', payload.accessToken);
+      saveSession(payload.accessToken, payload.user as AuthUser);
       onLoginSuccess?.();
     } catch (error) {
       setErro(

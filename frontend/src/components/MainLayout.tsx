@@ -88,7 +88,11 @@ const SettingsIcon: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' 
   </svg>
 );
 
-export const MainLayout: React.FC = () => {
+export interface MainLayoutProps {
+  onLogout?: () => void;
+}
+
+export const MainLayout: React.FC<MainLayoutProps> = ({ onLogout }) => {
   const [activeTab, setActiveTab] = useState<MainTab>('mapa');
   const [activeConfigSection, setActiveConfigSection] = useState<ConfigSectionId | null>(null);
 
@@ -100,7 +104,7 @@ export const MainLayout: React.FC = () => {
   };
 
   if (activeTab === 'mapa') {
-    return <MapPage onSelectTab={handleTabChange} />;
+    return <MapPage onSelectTab={handleTabChange} onLogout={onLogout} />;
   }
 
   return (

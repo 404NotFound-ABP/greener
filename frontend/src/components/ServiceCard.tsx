@@ -250,6 +250,42 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({
             )}
           </div>
         </div>
+
+        {/* 4. INFRAESTRUTURA: CPU, Memória, Disco e Rede (T22/US07) */}
+        {service.infraestrutura && (
+          service.infraestrutura.cpuPercent != null ||
+          service.infraestrutura.memoriaGb != null ||
+          service.infraestrutura.discoGb != null ||
+          service.infraestrutura.redeGb != null
+        ) && (
+          <div className="self-stretch flex flex-col justify-start items-start gap-[5px]">
+            <div className="text-white text-[14px] font-normal leading-[20px]">
+              Recursos de infraestrutura
+            </div>
+            <div className="self-stretch flex justify-start items-center gap-[6px] flex-wrap text-xs text-[#A6DEBD]">
+              {service.infraestrutura.cpuPercent != null && (
+                <span className="px-2 py-0.5 rounded border border-[#2FA862] bg-[#07150E]">
+                  CPU: {service.infraestrutura.cpuPercent} %
+                </span>
+              )}
+              {service.infraestrutura.memoriaGb != null && (
+                <span className="px-2 py-0.5 rounded border border-[#2FA862] bg-[#07150E]">
+                  Memória: {service.infraestrutura.memoriaGb} GB
+                </span>
+              )}
+              {service.infraestrutura.discoGb != null && (
+                <span className="px-2 py-0.5 rounded border border-[#2FA862] bg-[#07150E]">
+                  Disco: {service.infraestrutura.discoGb} GB
+                </span>
+              )}
+              {service.infraestrutura.redeGb != null && (
+                <span className="px-2 py-0.5 rounded border border-[#2FA862] bg-[#07150E]">
+                  Rede: {service.infraestrutura.redeGb} GB
+                </span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

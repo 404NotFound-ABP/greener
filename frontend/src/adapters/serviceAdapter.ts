@@ -47,6 +47,10 @@ export interface ExternalServicePayload {
     potencia_watts?: number | null;
     energia_kwh?: number | null;
     emissoes_gco2e?: number | null;
+    cpu_percent?: number | null;
+    memoria_gb?: number | null;
+    disco_gb?: number | null;
+    rede_gb?: number | null;
   } | null;
   valores?: {
     kwh?: number | null;
@@ -132,6 +136,12 @@ export class ServiceAdapter {
       valores: {
         kwh: parseMetric(raw.valores?.kwh ?? raw.ultima_coleta?.energia_kwh),
         gco2e: parseMetric(raw.valores?.gco2e ?? raw.ultima_coleta?.emissoes_gco2e)
+      },
+      infraestrutura: {
+        cpuPercent: parseMetric(raw.ultima_coleta?.cpu_percent),
+        memoriaGb: parseMetric(raw.ultima_coleta?.memoria_gb),
+        discoGb: parseMetric(raw.ultima_coleta?.disco_gb),
+        redeGb: parseMetric(raw.ultima_coleta?.rede_gb)
       },
       ...(raw.ultima_coleta?.coletado_em
         ? { ultimaAtualizacao: raw.ultima_coleta.coletado_em }
@@ -236,4 +246,7 @@ export class MockServiceRepository implements ServiceRepository {
   }
 }
 
-export const defaultServiceRepository: ServiceRepository = new MockServiceRepository();
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api').replace(/\/+$/, '');
+const SERVIDORES_ENDPOINT = `${API_BASE_URL}/servidores`;
+
+export const defaultServiceRepository: ServiceRepository = new HttpServiceRepository(SERVIDORES_ENDPOINT);

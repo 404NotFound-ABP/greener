@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { StatusBadge } from '../components/StatusBadge';
 import { ToggleSwitch } from '../components/ToggleSwitch';
 import { formatIntervalLabel } from '../hooks/useServicesPolling';
+import { clearSession } from '../utils/auth';
 
 interface AccountSettingsPageProps {
   onBack?: () => void;
@@ -516,6 +517,17 @@ export const AccountSettingsPage: React.FC<AccountSettingsPageProps> = ({ onBack
             </button>
           ))}
         </section>
+
+        {/* Ação de Logout */}
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => clearSession()}
+            className="px-4 py-2 rounded-lg bg-red-950/40 border border-red-500/50 hover:bg-red-900/60 text-red-200 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
+          >
+            Encerrar sessão
+          </button>
+        </div>
 
         {/* Bloco 2: Serviços monitorados e Intervalos (T29.2 / T30) */}
         <section className="bg-[#0E2218] border border-[#1B4D3E] rounded-[10px] p-4 sm:p-6 space-y-4">

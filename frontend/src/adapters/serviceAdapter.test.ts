@@ -45,7 +45,11 @@ describe('ServiceAdapter', () => {
           coletado_em: '2026-11-19T12:00:00.000Z',
           potencia_watts: 42,
           energia_kwh: 0.02,
-          emissoes_gco2e: 1.7
+          emissoes_gco2e: 1.7,
+          cpu_percent: 42.5,
+          memoria_gb: 8.0,
+          disco_gb: 120.0,
+          rede_gb: 1.2
         }
       },
       { id: 'worker', nome: 'Worker', status: 'indisponivel' },
@@ -58,6 +62,12 @@ describe('ServiceAdapter', () => {
       coords: [-23.55, -46.63],
       localizacao: { pais: 'Brasil', regiao: 'Sudeste', cidade: 'São Paulo' },
       valores: { kwh: 0.02, gco2e: 1.7 },
+      infraestrutura: {
+        cpuPercent: 42.5,
+        memoriaGb: 8.0,
+        discoGb: 120.0,
+        redeGb: 1.2
+      },
       ultimaAtualizacao: '2026-11-19T12:00:00.000Z'
     });
     expect(indisponivel?.status).toBe('Indisponível');
