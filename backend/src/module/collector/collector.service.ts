@@ -12,7 +12,7 @@ import { CarbonService } from '@/module/carbon/carbon.service';
 import { ImpactService } from '@/module/impact/impact.service';
 import { DRIZZLE_PROVIDER, DrizzleDB, schema } from '@/database';
 import { IntervalosConfigService } from '@/database/intervalos-config.service';
-import { eq, notInArray, desc, sql } from 'drizzle-orm';
+import { eq, notInArray, desc, sql, and, gte, lte } from 'drizzle-orm';
 import {
   AtualizarIntervalosDto,
   ConfiguracaoIntervalosDto,
@@ -382,19 +382,42 @@ export class CollectorService implements OnApplicationBootstrap, OnModuleDestroy
   }
 
   // Consulta histórico recente
-  async getHistorico(servidorId?: string, limite: number = 20) {
+  async getHistorico(
+    servidorId?: string,
+    limite: number = 20,
+    inicio?: string,
+    fim?: string,
+  ) {
+    const conditions: any[] = [];
+
     if (servidorId) {
-      return this.db
-        .select()
-        .from(schema.coletasMetricas)
-        .where(eq(schema.coletasMetricas.servidorId, servidorId))
+      conditions.push(eq(schema.coletasMetricas.servidorId, servidorId));
+    }
+
+    if (inicio) {
+      const dataInicio = new Date(inicio);
+      if (!Number.isNaN(dataInicio.getTime())) {
+        conditions.push(gte(schema.coletasMetricas.coletadoEm, dataInicio));
+      }
+    }
+
+    if (fim) {
+      const dataFim = new Date(fim);
+      if (!Number.isNaN(dataFim.getTime())) {
+        conditions.push(lte(schema.coletasMetricas.coletadoEm, dataFim));
+      }
+    }
+
+    const query = this.db.select().from(schema.coletasMetricas);
+
+    if (conditions.length > 0) {
+      return query
+        .where(and(...conditions))
         .orderBy(desc(schema.coletasMetricas.coletadoEm))
         .limit(limite);
     }
 
-    return this.db
-      .select()
-      .from(schema.coletasMetricas)
+    return query
       .orderBy(desc(schema.coletasMetricas.coletadoEm))
       .limit(limite);
   }

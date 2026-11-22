@@ -79,6 +79,8 @@ describe('HistoricoPage', () => {
     await waitFor(() => expect(buscar).toHaveBeenCalledTimes(2));
     const url = new URL(String(buscar.mock.calls[1][0]));
     expect(url.searchParams.get('servidorId')).toBe('SERVICO-OUTRO');
+    expect(url.searchParams.get('inicio')).toBeTruthy();
+    expect(url.searchParams.get('fim')).toBeTruthy();
     expect(screen.getByRole('row', { name: /SERVICO-OUTRO/ })).toBeInTheDocument();
     expect(screen.queryByRole('row', { name: /SERVICO-REAL/ })).not.toBeInTheDocument();
   });
@@ -134,6 +136,9 @@ describe('HistoricoPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Aplicar filtros' }));
 
     await waitFor(() => expect(buscar).toHaveBeenCalledTimes(2));
+    const urlPeriodo = new URL(String(buscar.mock.calls[1][0]));
+    expect(urlPeriodo.searchParams.get('inicio')).toContain(dataHoje);
+    expect(urlPeriodo.searchParams.get('fim')).toContain(dataHoje);
     expect(screen.getByRole('row', { name: /SERVICO-REAL/ })).toBeInTheDocument();
     expect(screen.queryByRole('row', { name: /SERVICO-FORA-DO-PERIODO/ })).not.toBeInTheDocument();
   });

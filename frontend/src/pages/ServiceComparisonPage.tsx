@@ -253,6 +253,8 @@ export const ServiceComparisonPage: React.FC<ServiceComparisonPageProps> = ({ on
           const url = new URL(HISTORY_URL);
           url.searchParams.set('servidorId', id);
           url.searchParams.set('limite', String(MAX_COLLECTIONS_PER_SERVICE));
+          url.searchParams.set('inicio', new Date(periodStart).toISOString());
+          url.searchParams.set('fim', new Date(periodEnd).toISOString());
           const payload = await fetchJson(url.toString(), controller.signal);
           if (!Array.isArray(payload)) {
             throw new Error(`O histórico de ${id} não está no formato esperado.`);

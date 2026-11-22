@@ -39,6 +39,40 @@ interface RankedRow extends RankingServiceItem {
   relativePercent: number;
 }
 
+interface ApiRankingItem {
+  posicao: number | null;
+  id: string;
+  nome: string;
+  status: string;
+  regiao: string;
+  intensidade_carbono?: number | null;
+  total_coletas?: number;
+  energia_total_kwh?: number | null;
+  emissoes_total_gco2e?: number | null;
+  potencia_media_watts?: number | null;
+  cpu_media_percent?: number | null;
+  potencia_watts?: number | null;
+  energia_kwh?: number | null;
+  emissoes_gco2e?: number | null;
+  cpu_percent?: number | null;
+}
+
+interface ApiRankingResponse {
+  criterio: string;
+  ordenado_por: string;
+  direcao: string;
+  janela_amostragem_segundos: number;
+  periodo?: {
+    inicio: string | null;
+    fim: string | null;
+  };
+  total: number;
+  ranking: ApiRankingItem[];
+}
+
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api').replace(/\/+$/, '');
+const RANKING_ENDPOINT = `${API_BASE_URL}/servidores/ranking`;
+
 const PERIOD_OPTIONS: Array<{
   key: CommonPeriodKey;
   label: string;
@@ -307,6 +341,86 @@ export const RankingPage: React.FC<RankingPageProps> = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedModalService, setSelectedModalService] = useState<ModalServiceData | null>(null);
 
+  const [apiRankingItems, setApiRankingItems] = useState<RankingServiceItem[]>([]);
+  const [isLoadingApiRanking, setIsLoadingApiRanking] = useState(false);
+  const [apiRankingError, setApiRankingError] = useState<string | null>(null);
+  const [apiCommonPeriod, setApiCommonPeriod] = useState<string | null>(null);
+  const rankingAbortRef = useRef<AbortController | null>(null);
+
+  const fetchApiRanking = useCallback(async () => {
+    if (useSimulatedData) return;
+    rankingAbortRef.current?.abort();
+    const controller = new AbortController();
+    rankingAbortRef.current = controller;
+    setIsLoadingApiRanking(true);
+    setApiRankingError(null);
+
+    try {
+      const url = new URL(RANKING_ENDPOINT);
+      url.searchParams.set('ordenarPor', selectedMetric === 'energy' ? 'energia' : 'emissoes');
+      url.searchParams.set('ordem', sortDirection);
+      if (selectedPeriod === 'api_current') {
+        url.searchParams.set('criterio', 'instantaneo');
+      } else {
+        url.searchParams.set('criterio', 'acumulado');
+        const janela = selectedPeriod === '1h' ? 3600 : selectedPeriod === '24h' ? 86400 : 604800;
+        url.searchParams.set('janelaSegundos', String(janela));
+      }
+      url.searchParams.set('limite', '100');
+
+      const res = await fetch(url.toString(), { signal: controller.signal });
+      if (!res.ok) {
+        throw new Error(`A API respondeu com status HTTP ${res.status}`);
+      }
+      const data = (await res.json()) as ApiRankingResponse;
+      if (controller.signal.aborted) return;
+
+      if (data.periodo?.inicio && data.periodo?.fim) {
+        const fmt = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+        const d1 = new Date(data.periodo.inicio);
+        const d2 = new Date(data.periodo.fim);
+        if (Number.isFinite(d1.getTime()) && Number.isFinite(d2.getTime())) {
+          setApiCommonPeriod(`${fmt.format(d1)} – ${fmt.format(d2)}`);
+        }
+      } else {
+        setApiCommonPeriod(null);
+      }
+
+      const mapped: RankingServiceItem[] = (data.ranking || []).map((row) => {
+        const energy = row.energia_total_kwh !== undefined ? row.energia_total_kwh : (row.energia_kwh ?? null);
+        const emissions = row.emissoes_total_gco2e !== undefined ? row.emissoes_total_gco2e : (row.emissoes_gco2e ?? null);
+        const statusKey = resolveServiceFilterKey(row.status);
+
+        return {
+          id: row.id,
+          name: row.nome || row.id,
+          location: row.regiao || 'Localização não informada',
+          statusLabel: STATUS_CONFIG[statusKey].label,
+          statusKey,
+          energyKwh: energy,
+          emissionsGco2e: emissions,
+          collectedAt: null,
+          isSimulated: false,
+        };
+      });
+
+      setApiRankingItems(mapped);
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return;
+      setApiRankingError(err instanceof Error ? err.message : 'Falha ao consultar o ranking da API.');
+    } finally {
+      if (rankingAbortRef.current === controller) {
+        rankingAbortRef.current = null;
+        setIsLoadingApiRanking(false);
+      }
+    }
+  }, [useSimulatedData, selectedMetric, sortDirection, selectedPeriod]);
+
+  useEffect(() => {
+    void fetchApiRanking();
+    return () => rankingAbortRef.current?.abort();
+  }, [fetchApiRanking]);
+
   const periodDropdownRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -326,27 +440,27 @@ export const RankingPage: React.FC<RankingPageProps> = () => {
   );
 
   const baseItems = useMemo<RankingServiceItem[]>(() => {
-    const sourceItems = useSimulatedData
-      ? SIMULATED_RANKING_SERVICES
-      : services.map(mapApiServiceToRankingItem);
+    if (useSimulatedData) {
+      return SIMULATED_RANKING_SERVICES.map((item) => {
+        const factor = activePeriodMeta.multiplier;
+        return {
+          ...item,
+          energyKwh:
+            item.energyKwh !== null ? Number((item.energyKwh * factor).toFixed(4)) : null,
+          emissionsGco2e:
+            item.emissionsGco2e !== null
+              ? Number((item.emissionsGco2e * factor).toFixed(4))
+              : null,
+        };
+      });
+    }
 
-    return sourceItems.map((item) => {
-      const factor =
-        selectedPeriod === 'api_current' && !useSimulatedData
-          ? 1
-          : activePeriodMeta.multiplier;
+    if (apiRankingItems.length > 0) {
+      return apiRankingItems;
+    }
 
-      return {
-        ...item,
-        energyKwh:
-          item.energyKwh !== null ? Number((item.energyKwh * factor).toFixed(4)) : null,
-        emissionsGco2e:
-          item.emissionsGco2e !== null
-            ? Number((item.emissionsGco2e * factor).toFixed(4))
-            : null,
-      };
-    });
-  }, [services, useSimulatedData, selectedPeriod, activePeriodMeta.multiplier]);
+    return services.map(mapApiServiceToRankingItem);
+  }, [useSimulatedData, apiRankingItems, services, activePeriodMeta.multiplier]);
 
   const rankedRows = useMemo<RankedRow[]>(() => {
     const query = searchQuery.toLowerCase().trim();
@@ -694,7 +808,7 @@ export const RankingPage: React.FC<RankingPageProps> = () => {
           <div className="flex flex-wrap items-center gap-2">
             <span className="px-2.5 py-1 rounded-lg bg-[#07150E] border border-[#385E47] text-[#D4E3DA]">
               <span className="font-medium text-[#F2FAF5]">Período comum:</span>{' '}
-              {activePeriodMeta.label} ({formatCommonPeriodRange(summary, selectedPeriod)})
+              {activePeriodMeta.label} ({apiCommonPeriod || formatCommonPeriodRange(summary, selectedPeriod)})
             </span>
             <span className="px-2.5 py-1 rounded-lg bg-[#07150E] border border-[#385E47] text-[#D4E3DA]">
               <span className="font-medium text-[#F2FAF5]">Ordenação:</span>{' '}
@@ -718,7 +832,7 @@ export const RankingPage: React.FC<RankingPageProps> = () => {
       </section>
 
       {/* Estados de Carregamento, Falha ou Lista Vazia */}
-      {isInitialLoad && !useSimulatedData ? (
+      {(isLoadingApiRanking || (isInitialLoad && apiRankingItems.length === 0)) && !useSimulatedData ? (
         <div
           role="status"
           aria-live="polite"
@@ -729,10 +843,10 @@ export const RankingPage: React.FC<RankingPageProps> = () => {
             Carregando ranking de serviços por impacto...
           </p>
           <p className="text-[14px] leading-[20px] font-normal text-[#9DB0A4]">
-            Sincronizando medições de energia (kWh) e emissão (gCO₂e) para o período selecionado.
+            Sincronizando medições de energia (kWh) e emissão (gCO₂e) da API para o período selecionado.
           </p>
         </div>
-      ) : hasError && !useSimulatedData && services.length === 0 ? (
+      ) : (apiRankingError || (hasError && apiRankingItems.length === 0)) && !useSimulatedData ? (
         <div
           role="alert"
           className="bg-[#240B0B]/80 border-2 border-[#F35B1B] rounded-2xl p-6 sm:p-8 text-center space-y-3"
@@ -741,12 +855,15 @@ export const RankingPage: React.FC<RankingPageProps> = () => {
             Não foi possível carregar os dados do ranking
           </p>
           <p className="text-[14px] leading-[20px] font-normal text-[#F2FAF5]/85 max-w-lg mx-auto">
-            A API de indicadores não respondeu. Você pode tentar sincronizar novamente ou visualizar a estrutura com dados simulados.
+            {apiRankingError || 'A API de ranking não respondeu. Você pode tentar novamente ou visualizar com dados simulados.'}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
             <button
               type="button"
-              onClick={() => void triggerRefresh()}
+              onClick={() => {
+                void triggerRefresh();
+                void fetchApiRanking();
+              }}
               className="px-4 py-2.5 rounded-xl bg-[#9E2B25] hover:bg-[#B83232] text-white text-[14px] leading-[20px] font-medium transition-colors cursor-pointer"
             >
               Tentar novamente

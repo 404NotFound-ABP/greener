@@ -168,7 +168,7 @@ export const HistoricoPage = () => {
   const [servicosConhecidos, setServicosConhecidos] = useState<string[]>([]);
   const requestRef = useRef<AbortController | null>(null);
 
-  const carregarHistorico = useCallback(async (filtroServidorId: string) => {
+  const carregarHistorico = useCallback(async (filtroServidorId?: string, inicioIso?: string, fimIso?: string) => {
     requestRef.current?.abort();
     const controller = new AbortController();
     requestRef.current = controller;
@@ -179,6 +179,8 @@ export const HistoricoPage = () => {
       const url = new URL(HISTORICO_URL);
       url.searchParams.set('limite', String(LIMITE_HISTORICO));
       if (filtroServidorId) url.searchParams.set('servidorId', filtroServidorId);
+      if (inicioIso) url.searchParams.set('inicio', inicioIso);
+      if (fimIso) url.searchParams.set('fim', fimIso);
 
       const response = await fetch(url.toString(), { signal: controller.signal });
       if (!response.ok) {
@@ -269,7 +271,9 @@ export const HistoricoPage = () => {
       inicio: inicio.getTime(),
       fim: fim.getTime() + 24 * 60 * 60 * 1000 - 1,
     });
-    void carregarHistorico(servidorId);
+    const inicioIso = new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate()).toISOString();
+    const fimIso = new Date(fim.getFullYear(), fim.getMonth(), fim.getDate(), 23, 59, 59, 999).toISOString();
+    void carregarHistorico(servidorId, inicioIso, fimIso);
   };
 
   const contagemStatus = (status: string) =>
@@ -366,7 +370,13 @@ export const HistoricoPage = () => {
           <span>Não foi possível carregar o histórico: {erro}</span>
           <button
             type="button"
-            onClick={() => void carregarHistorico(filtrosAplicados?.servidorId ?? '')}
+            onClick={() =>
+              void carregarHistorico(
+                filtrosAplicados.servidorId,
+                new Date(filtrosAplicados.inicio).toISOString(),
+                new Date(filtrosAplicados.fim).toISOString(),
+              )
+            }
             disabled={carregando}
             className="self-start rounded-lg border border-red-300/70 px-3 py-2 font-semibold hover:bg-red-900/50 disabled:opacity-60 sm:self-auto"
           >

@@ -75,11 +75,15 @@ export class CollectorController {
   @ApiOperation({ summary: 'Lista as últimas medições salvas no PostgreSQL' })
   @ApiQuery({ name: 'servidorId', required: false, description: 'ID do servidor para filtrar' })
   @ApiQuery({ name: 'limite', required: false, description: 'Quantidade máxima de registros (padrão: 20)' })
+  @ApiQuery({ name: 'inicio', required: false, description: 'Data de início ISO (ex: 2026-11-01T00:00:00Z)' })
+  @ApiQuery({ name: 'fim', required: false, description: 'Data de fim ISO (ex: 2026-11-22T23:59:59Z)' })
   @ApiResponse({ status: 200, description: 'Lista de snapshots de medições históricas', type: [ColetaMetricaItemDto] })
   async getHistorico(
     @Query('servidorId') servidorId?: string,
     @Query('limite') limite?: string,
+    @Query('inicio') inicio?: string,
+    @Query('fim') fim?: string,
   ): Promise<any> {
-    return this.collectorService.getHistorico(servidorId, Number(limite) || 20);
+    return this.collectorService.getHistorico(servidorId, Number(limite) || 20, inicio, fim);
   }
 }

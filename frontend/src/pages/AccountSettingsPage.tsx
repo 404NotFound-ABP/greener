@@ -27,7 +27,8 @@ const INTERVAL_OPTIONS = [
   { label: '1 mês (30 dias)', value: 2592000 },
 ];
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
+const RAW_API_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api').replace(/\/+$/, '');
+const API_BASE_URL = RAW_API_URL.endsWith('/api') ? RAW_API_URL : `${RAW_API_URL}/api`;
 
 function formatDateTimeBR(isoDate?: string | null): string {
   if (!isoDate) return 'Nenhuma atualização registrada';
@@ -102,9 +103,9 @@ export const AccountSettingsPage: React.FC<AccountSettingsPageProps> = ({ onBack
 
     try {
       const [statusRes, configRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/coleta/status`).catch(() => null),
+        fetch(`${API_BASE_URL}/coleta/status`).catch(() => null),
         token
-          ? fetch(`${API_BASE_URL}/api/coleta/configuracao`, {
+          ? fetch(`${API_BASE_URL}/coleta/configuracao`, {
               headers: { Authorization: `Bearer ${token}` },
             }).catch(() => null)
           : Promise.resolve(null),
@@ -309,7 +310,7 @@ export const AccountSettingsPage: React.FC<AccountSettingsPageProps> = ({ onBack
   const handleDiscoverServices = async () => {
     setIsDiscovering(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/coleta/executar`, { method: 'POST' });
+      const response = await fetch(`${API_BASE_URL}/coleta/executar`, { method: 'POST' });
       if (response.ok) {
         await fetchIntervalsAndStatus();
         showToast('Ciclo de coleta executado e status atualizado.');
@@ -338,10 +339,11 @@ export const AccountSettingsPage: React.FC<AccountSettingsPageProps> = ({ onBack
     const token =
       localStorage.getItem('token') ||
       localStorage.getItem('access_token') ||
-      sessionStorage.getItem('token');
+      sessionStorage.getItem('token') ||
+      sessionStorage.getItem('access_token');
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/coleta/configuracao`, {
+      const response = await fetch(`${API_BASE_URL}/coleta/configuracao`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -376,18 +378,22 @@ export const AccountSettingsPage: React.FC<AccountSettingsPageProps> = ({ onBack
         setRefreshInterval(savedConfig.refreshInterval);
         setFeedback({
           type: 'error',
-          message: 'Permissão de administrador necessária para alterar os intervalos no servidor.',
+          message: 'Permissão de administrador necessária para alterar os intervalos no servidor. A configuração anterior foi mantida.',
         });
       } else {
-        throw new Error(`HTTP ${response.status}`);
+        setCollectionInterval(savedConfig.collectionInterval);
+        setRefreshInterval(savedConfig.refreshInterval);
+        setFeedback({
+          type: 'error',
+          message: 'Falha ao salvar intervalos no servidor. A configuração anterior foi mantida.',
+        });
       }
     } catch {
-      // Fallback local caso o back-end ainda não esteja em execução
-      setSavedConfig({ collectionInterval, refreshInterval });
-      setLastConfigUpdatedAt(new Date().toISOString());
+      setCollectionInterval(savedConfig.collectionInterval);
+      setRefreshInterval(savedConfig.refreshInterval);
       setFeedback({
-        type: 'success',
-        message: 'Intervalos aplicados localmente (aguardando conexão com o servidor para persistência).',
+        type: 'error',
+        message: 'Não foi possível conectar ao servidor para salvar os intervalos. A configuração anterior foi mantida.',
       });
     } finally {
       setIsSaving(false);
