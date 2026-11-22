@@ -22,9 +22,26 @@ describe('ServiceCard', () => {
     // Assert
     expect(nomes.length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Ativo/).length).toBeGreaterThan(0);
+    expect(screen.getByText('País: Brasil')).toBeInTheDocument();
+    expect(screen.getByText('Região: Sudeste')).toBeInTheDocument();
     expect(screen.getByText('Cidade: Jacareí')).toBeInTheDocument();
     expect(screen.getAllByText('0,25 kWh').length).toBeGreaterThan(0);
     expect(screen.getAllByText('100 gCO₂e').length).toBeGreaterThan(0);
+  });
+
+  it('mostra fallback quando localização não é informada', () => {
+    render(
+      <ServiceCard
+        service={{
+          ...servico,
+          localizacao: undefined,
+        }}
+      />
+    );
+
+    expect(screen.getByText('País: Não informado')).toBeInTheDocument();
+    expect(screen.getByText('Região: Não informada')).toBeInTheDocument();
+    expect(screen.getByText('Cidade: Não informada')).toBeInTheDocument();
   });
 
   it('mostra estado indisponível quando o serviço não está ativo', () => {

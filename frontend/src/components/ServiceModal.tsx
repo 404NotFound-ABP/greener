@@ -6,6 +6,14 @@ export interface ModalServiceData {
   name: string;
   status: 'ativo' | 'indisponível' | 'sem_metricas' | string;
   location?: string | null;
+  country?: string | null;
+  region?: string | null;
+  city?: string | null;
+  localizacao?: {
+    pais?: string | null;
+    regiao?: string | null;
+    cidade?: string | null;
+  } | null;
   kwh?: number | null;
   co2?: number | null;
   period?: string;
@@ -101,11 +109,48 @@ function formatAxisTick(date: Date, spansMultipleDays: boolean): string {
   }).format(date);
 }
 
+function resolveLocationParts(service: ModalServiceData): {
+  country: string;
+  region: string;
+  city: string;
+} {
+  const locObj = service.localizacao;
+  let country = (service.country ?? locObj?.pais)?.trim() || '';
+  let region = (service.region ?? locObj?.regiao)?.trim() || '';
+  let city = (service.city ?? locObj?.cidade)?.trim() || '';
+
+  if ((!country || !city) && service.location?.trim()) {
+    const raw = service.location.trim();
+    const delimiter = raw.includes(' - ') ? ' - ' : raw.includes(',') ? ',' : null;
+    if (delimiter) {
+      const parts = raw.split(delimiter).map((p) => p.trim()).filter(Boolean);
+      if (parts.length === 3) {
+        if (!city) city = parts[0];
+        if (!region) region = parts[1];
+        if (!country) country = parts[2];
+      } else if (parts.length === 2) {
+        if (!city) city = parts[0];
+        if (!country) country = parts[1];
+      } else if (parts.length === 1 && !city) {
+        city = parts[0];
+      }
+    } else if (!city) {
+      city = raw;
+    }
+  }
+
+  return { country, region, city };
+}
+
 function extractCityName(location?: string | null): string {
   const trimmed = location?.trim();
   if (!trimmed) return 'Não informada';
-  const [cityPart] = trimmed.split(',');
-  return cityPart?.trim() || trimmed;
+  const delimiter = trimmed.includes(' - ') ? ' - ' : trimmed.includes(',') ? ',' : null;
+  if (delimiter) {
+    const [cityPart] = trimmed.split(delimiter);
+    return cityPart?.trim() || trimmed;
+  }
+  return trimmed;
 }
 
 export const ServiceModal: React.FC<ServiceModalProps> = ({
@@ -306,7 +351,10 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
     return detected.length > 0 ? detected : DEFAULT_METRICS_ITEMS;
   }, [history]);
 
-  const cityLabel = extractCityName(service.location);
+  const { country, region, city } = resolveLocationParts(service);
+  const countryLabel = country || 'Não informado';
+  const regionLabel = region || 'Não informada';
+  const cityLabel = city || 'Não informada';
   const unitLabel = selectedMetric === 'kwh' ? 'kWh' : 'gCO₂e';
   const axisYTitle = selectedMetric === 'kwh' ? 'Energia (kWh)' : 'Emissões (gCO₂e)';
 
@@ -684,6 +732,18 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
             </span>
           </div>
         )}
+
+        <div className="max-w-full px-2 py-1 rounded-[8px] border border-[#2FA862] flex justify-start items-center">
+          <span className="truncate text-[#F2FAF5] text-[12px] sm:text-[13px] font-normal leading-tight">
+            País: {countryLabel}
+          </span>
+        </div>
+
+        <div className="max-w-full px-2 py-1 rounded-[8px] border border-[#2FA862] flex justify-start items-center">
+          <span className="truncate text-[#F2FAF5] text-[12px] sm:text-[13px] font-normal leading-tight">
+            Região: {regionLabel}
+          </span>
+        </div>
 
         <div className="max-w-full px-2 py-1 rounded-[8px] border border-[#2FA862] flex justify-start items-center">
           <span className="truncate text-[#F2FAF5] text-[12px] sm:text-[13px] font-normal leading-tight">

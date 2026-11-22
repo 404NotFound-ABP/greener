@@ -22,6 +22,9 @@ interface RankingServiceItem {
   id: string;
   name: string;
   location: string;
+  country?: string;
+  region?: string;
+  city?: string;
   statusLabel: string;
   statusKey: ServiceFilterKey;
   energyKwh: number | null;
@@ -158,6 +161,9 @@ function mapApiServiceToRankingItem(service: DashboardService): RankingServiceIt
     id: service.id,
     name: service.nome || service.id,
     location: location || 'Localização não informada',
+    country,
+    region,
+    city,
     statusLabel: STATUS_CONFIG[statusKey].label,
     statusKey,
     energyKwh: latest?.energia_kwh ?? null,
@@ -214,6 +220,14 @@ function toModalData(item: RankedRow): ModalServiceData {
     name: item.name,
     status,
     location: item.location,
+    country: item.country || null,
+    region: item.region || null,
+    city: item.city || null,
+    localizacao: {
+      pais: item.country || null,
+      regiao: item.region || null,
+      cidade: item.city || null,
+    },
     kwh: item.energyKwh,
     co2: item.emissionsGco2e,
     lastUpdate: item.collectedAt ?? undefined,

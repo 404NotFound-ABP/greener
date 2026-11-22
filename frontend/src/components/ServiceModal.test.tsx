@@ -16,6 +16,8 @@ describe('modal de serviço', () => {
     render(<ServiceModal service={servico('ativo')} onClose={fechar} />);
 
     expect(screen.getByText('Servidor Centro')).toBeInTheDocument();
+    expect(screen.getByText('País: Não informado')).toBeInTheDocument();
+    expect(screen.getByText('Região: Não informada')).toBeInTheDocument();
     expect(screen.getByText('Cidade: São Paulo')).toBeInTheDocument();
     expect(screen.getByText('Métricas disponíveis')).toBeInTheDocument();
     expect(screen.getByText('CPU')).toBeInTheDocument();
@@ -23,6 +25,23 @@ describe('modal de serviço', () => {
     expect(screen.getByRole('button', { name: 'Ver dashboard completo' })).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole('button')[0]);
     expect(fechar).toHaveBeenCalled();
+  });
+
+  it('mostra país, região e cidade estruturados quando fornecidos', () => {
+    render(
+      <ServiceModal
+        service={{
+          ...servico('ativo'),
+          country: 'Brasil',
+          region: 'Sudeste',
+          city: 'São Paulo',
+        }}
+      />
+    );
+
+    expect(screen.getByText('País: Brasil')).toBeInTheDocument();
+    expect(screen.getByText('Região: Sudeste')).toBeInTheDocument();
+    expect(screen.getByText('Cidade: São Paulo')).toBeInTheDocument();
   });
 
   it('distingue serviço indisponível e último valor conhecido', () => {
