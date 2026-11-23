@@ -138,7 +138,19 @@ describe('HistoricoPage', () => {
     await waitFor(() => expect(buscar).toHaveBeenCalledTimes(2));
     const urlPeriodo = new URL(String(buscar.mock.calls[1][0]));
     expect(urlPeriodo.searchParams.get('inicio')).toContain(dataHoje);
-    expect(urlPeriodo.searchParams.get('fim')).toContain(dataHoje);
+    const fim = urlPeriodo.searchParams.get('fim');
+
+    expect(fim).not.toBeNull();
+
+    const dataFimLocal = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Sao_Paulo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date(fim!));
+
+    expect(dataFimLocal).toBe(dataHoje);
+
     expect(screen.getByRole('row', { name: /SERVICO-REAL/ })).toBeInTheDocument();
     expect(screen.queryByRole('row', { name: /SERVICO-FORA-DO-PERIODO/ })).not.toBeInTheDocument();
   });
@@ -168,7 +180,7 @@ describe('HistoricoPage', () => {
   });
 
   it('mostra mensagem de carregamento enquanto a consulta está pendente', () => {
-    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => { })));
 
     render(<HistoricoPage />);
 
