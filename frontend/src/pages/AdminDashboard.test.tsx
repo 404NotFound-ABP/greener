@@ -32,7 +32,7 @@ describe('painel administrativo integrado', () => {
       expect(screen.getByText('João Augusto de Souza')).toBeInTheDocument();
     });
     expect(screen.getByText('Maria Clara Santos')).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledWith('/api/users', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/users'), expect.objectContaining({
       headers: expect.objectContaining({
         Authorization: 'Bearer jwt-admin-token',
       }),
@@ -112,7 +112,7 @@ describe('painel administrativo integrado', () => {
       expect(screen.getByRole('status')).toHaveTextContent('criado com sucesso');
     });
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/users', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/users'), expect.objectContaining({
       method: 'POST',
       body: JSON.stringify({
         name: 'Novo Admin',
@@ -172,7 +172,7 @@ describe('painel administrativo integrado', () => {
       expect(screen.getByRole('status')).toHaveTextContent('atualizado com sucesso');
     });
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/users/1', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/users/1'), expect.objectContaining({
       method: 'PATCH',
       body: JSON.stringify({
         name: 'João Editado',
@@ -202,7 +202,7 @@ describe('painel administrativo integrado', () => {
       expect(screen.getByRole('status')).toHaveTextContent('removido com sucesso');
     });
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/users/1', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/users/1'), expect.objectContaining({
       method: 'DELETE',
     }));
   });

@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { OrbitsBackground } from '../components/auth/OrbitsBackground';
 import { GreenerGlobeLogo } from '../components/auth/GreenerGlobeLogo';
 
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api').replace(/\/+$/, '');
+
 export interface RegisterStep3Props {
   registrationData?: {
     nome?: string;
@@ -46,7 +48,7 @@ export const RegisterStep3: React.FC<RegisterStep3Props> = ({
       setIsLoading(true);
       try {
         const fullName = `${registrationData.nome || ''} ${registrationData.sobrenome || ''}`.trim() || 'Usuário GreenER';
-        const res = await fetch('/api/auth/register', {
+        const res = await fetch(`${API_BASE_URL}/auth/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

@@ -52,7 +52,7 @@ interface NormalizedPoint {
   co2: number;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api').replace(/\/+$/, '');
 const DEFAULT_METRICS_ITEMS: string[] = ['CPU', 'Memória', 'Armazenamento', 'Rede'];
 
 function parseNumeric(value: string | number | null | undefined): number | null {
@@ -184,7 +184,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
     try {
       const servidorId = encodeURIComponent(String(service.id));
       const response = await fetch(
-        `${API_BASE_URL}/api/coleta/historico?servidorId=${servidorId}&limite=12`
+        `${API_BASE_URL}/coleta/historico?servidorId=${servidorId}&limite=12`
       );
 
       if (!response.ok) {

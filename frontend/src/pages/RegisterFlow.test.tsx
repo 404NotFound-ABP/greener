@@ -149,7 +149,7 @@ describe('cadastro em etapas', () => {
       expect(screen.getByText('Cadastro realizado com sucesso!')).toBeInTheDocument();
     });
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/auth/register', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/auth/register'), expect.objectContaining({
       method: 'POST',
       body: JSON.stringify({
         name: 'Carlos Lima',

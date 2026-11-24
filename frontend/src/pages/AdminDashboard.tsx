@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { getSessionToken, handleSessionExpired } from '../utils/auth';
 
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api').replace(/\/+$/, '');
+
 export interface AdminUser {
   id: number | string;
   name: string;
@@ -56,7 +58,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const token = getSessionToken();
 
     try {
-      const res = await fetch('/api/users', {
+      const res = await fetch(`${API_BASE_URL}/users`, {
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
           'Content-Type': 'application/json',
@@ -115,7 +117,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
     const token = getSessionToken();
     try {
-      const res = await fetch('/api/users', {
+      const res = await fetch(`${API_BASE_URL}/users`, {
         method: 'POST',
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -192,7 +194,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         updatePayload.password = editPassword.trim();
       }
 
-      const res = await fetch(`/api/users/${editingUser.id}`, {
+      const res = await fetch(`${API_BASE_URL}/users/${editingUser.id}`, {
         method: 'PATCH',
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -242,7 +244,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
     const token = getSessionToken();
     try {
-      const res = await fetch(`/api/users/${userToDelete.id}`, {
+      const res = await fetch(`${API_BASE_URL}/users/${userToDelete.id}`, {
         method: 'DELETE',
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
