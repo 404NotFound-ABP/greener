@@ -142,17 +142,6 @@ function resolveLocationParts(service: ModalServiceData): {
   return { country, region, city };
 }
 
-function extractCityName(location?: string | null): string {
-  const trimmed = location?.trim();
-  if (!trimmed) return 'Não informada';
-  const delimiter = trimmed.includes(' - ') ? ' - ' : trimmed.includes(',') ? ',' : null;
-  if (delimiter) {
-    const [cityPart] = trimmed.split(delimiter);
-    return cityPart?.trim() || trimmed;
-  }
-  return trimmed;
-}
-
 export const ServiceModal: React.FC<ServiceModalProps> = ({
   service,
   onClose,
