@@ -11,7 +11,7 @@ import { AdminLogin } from './pages/AdminLogin';
 import { AdminDashboard } from './pages/AdminDashboard';
 
 import { MainLayout } from './components/MainLayout';
-import { clearSession, isAdmin, isAuthenticated } from './utils/auth';
+import { clearSession, isAdmin } from './utils/auth';
 
 export function App() {
   // Estado que controla qual ecrã está visível no momento
