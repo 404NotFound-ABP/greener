@@ -37,12 +37,6 @@ export function App() {
     localizacao: '',
   });
 
-  useEffect(() => {
-    const handleExpired = (event: Event) => {
-      const custom = event as CustomEvent<{ message?: string }>;
-      setSessionMessage(custom.detail?.message || 'Sua sessão expirou. Por favor, faça login novamente.');
-      setCurrentScreen('login');
-    };
 useEffect(() => {
   const handleExpired = (event: Event) => {
     const custom = event as CustomEvent<{ message?: string }>;
