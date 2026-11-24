@@ -44,11 +44,29 @@ export function App() {
       setCurrentScreen('login');
     };
 
-    window.addEventListener('greener:session_expired', handleExpired);
-    return () => {
-      window.removeEventListener('greener:session_expired', handleExpired);
-    };
-  }, []);
+useEffect(() => {
+  const handleExpired = (event: Event) => {
+    const custom = event as CustomEvent<{ message?: string }>;
+    setSessionMessage(
+      custom.detail?.message ||
+      'Sua sessão expirou. Por favor, faça login novamente.'
+    );
+    setCurrentScreen('login');
+  };
+
+  const handleLogoutEvent = () => {
+    setSessionMessage(null);
+    setCurrentScreen('login');
+  };
+
+  window.addEventListener('greener:session_expired', handleExpired);
+  window.addEventListener('greener:logout', handleLogoutEvent);
+
+  return () => {
+    window.removeEventListener('greener:session_expired', handleExpired);
+    window.removeEventListener('greener:logout', handleLogoutEvent);
+  };
+}, []);
 
   const handleLogout = () => {
     clearSession();
